@@ -22,11 +22,21 @@ sipCore::sipCore()
 	log_cfg.log_file_flags = PJ_O_APPEND;
 
 	// setup callbacks for application
+	cfg.cb.on_incoming_call = &on_incoming_call;
+	cfg.cb.on_call_media_state = &on_call_media_state;
+	cfg.cb.on_call_state = &on_call_state;
+
+	status = pjsua_init(&cfg, &log_cfg, &media_cfg);
+	if (status != PJ_SUCCESS) error_exit("cannot initialize pjsua!", status);
+
+	int result = createTransport();
 
 
+	//TODO: create one or more SIP accounts
 
+	//TODO: add one or more buddies 
 
-
+	//TODO: configure sound device,		codec settings, and other media settings
 }
 
 sipCore::~sipCore()
@@ -40,3 +50,21 @@ int sipCore::init()
 {
 
 };
+
+int sipCore::createTransport()
+{
+
+	pjsua_transport_config transportConfig;
+	pjsua_transport_info transportInfo;
+
+	pjsua_transport_config_default(&transportConfig);
+
+	transportConfig.public_addr = public_address;
+
+	transportConfig.port = 5060;
+
+	pj_status_t status = pjsua_transport_create(PJSIP_TRANSPORT_UDP, &transportConfig, NULL)
+	
+
+
+}
