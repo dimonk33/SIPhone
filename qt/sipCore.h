@@ -16,6 +16,10 @@
 #include <pjmedia-codec.h>
 
 #include <qsettings.h>
+#include <QTextCodec.h>
+
+#include "callWindow.h"
+
 
 #define THIS_FILE       __FILE__
 
@@ -31,14 +35,16 @@
 #define POOL_MEMORY_CREATION 1024
 #define POOL_MEMORY_CREATION_INCREMENT 32
 
-#define BUDDY_URI "202@example.com"
+#define BUDDY_URI "sip:202@example.com"
 
 #define FILE_CONFIG_ACCOUNT_SETTINGS "account.inf"
 
 class sipCore
 {
 	pjsua_acc_id acc_id;
-	
+	pjsua_buddy_id * ids;
+	int numberOfBuddies;
+
 public:
 	sipCore();
 	~sipCore();
@@ -46,9 +52,10 @@ public:
 	void load_config();
 
 
-	void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rdata) = 0;
-	void on_call_media_state(pjsua_call_id call_id) = 0;
-	void on_call_state(pjsua_call_id call_id, pjsip_event *e) = 0;
+	//how to make it non-static
+	static void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rdata);
+	static void on_call_media_state(pjsua_call_id call_id);
+	static void on_call_state(pjsua_call_id call_id, pjsip_event *e);
 
 	int createTransport();
 	int registerToServer();
