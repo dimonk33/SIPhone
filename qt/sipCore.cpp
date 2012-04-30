@@ -1,5 +1,6 @@
 #include "sipCore.h"
 
+#include "qt.h"
 sipCore::sipCore()
 {
 
@@ -30,11 +31,11 @@ sipCore::sipCore()
 	// setup callbacks for application
 	void (* on_incoming_callcb)(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rx_data) = on_incoming_call;
 	cfg.cb.on_incoming_call = on_incoming_callcb;
-	void (* on_call_media_statecb)(pjsua_call_id call_id) = on_call_media_state;
+	void (* on_call_media_statecb)(pjsua_call_id call_id) = &this->on_call_media_state;
 	void (* on_call_statecb)(pjsua_call_id call_id, pjsip_event *e) = on_call_state;
 
-	cfg.cb.on_call_media_state = &on_call_media_state;
-	cfg.cb.on_call_state = &on_call_state;
+	cfg.cb.on_call_media_state = on_call_media_statecb;
+	cfg.cb.on_call_state = on_call_statecb;
 
 	status = pjsua_init(&cfg, &log_cfg, &media_cfg);
 	if (status != PJ_SUCCESS) error_exit("cannot initialize pjsua!", status);
@@ -48,17 +49,36 @@ sipCore::sipCore()
 
 	registerToServer();
 
-	addBuddy();
+
+
+	/*pjmedia_aud_dev_info * audioDevices = new pjmedia_aud_dev_info[100];
+	unsigned int numOfAudioDevices = 100;
+	status = pjsua_enum_aud_devs(audioDevices, &numOfAudioDevices);
+	if (status != PJ_SUCCESS) error_exit("Error starting pjsua", status);
+
+
+
+	int captureDevice = 1, playbackDevice = 2;
+
+	status = pjsua_get_snd_dev(&captureDevice, &playbackDevice);
+	if (status != PJ_SUCCESS) error_exit("Error starting pjsua", status);
+
+
+	status = pjsua_set_snd_dev(captureDevice, playbackDevice);
+	if (status != PJ_SUCCESS) error_exit("Error starting pjsua", status);*/
+
+
+//	
 
 	//pj_str_t uri = pj_str(BUDDY_URI);
 	//status = pjsua_call_make_call(acc_id, &uri, 0, NULL, NULL, NULL);
 	//if (status != PJ_SUCCESS) error_exit("Error making call", status);
 
-	CallWindow * w = new CallWindow();
+//	CallWindow * w = new CallWindow();
 //	w->setCallerInfo(caller_info.acc_uri.ptr);
-	w->setStatusInfo("trying window");
+//	w->setStatusInfo("trying window");
 //	w->setCallId(call_id);
-	w->show();
+//	w->show();
 
 
 	//TODO: create one or more SIP accounts
@@ -66,6 +86,13 @@ sipCore::sipCore()
 	//TODO: add one or more buddies 
 
 	//TODO: configure sound device,	codec settings, and other media settings
+
+	addBuddies();
+
+	pjsua_call_id callId;
+	pj_str_t buri = pj_str(BUDDY_URI);
+	status = pjsua_call_make_call(acc_id, &buri, 0, NULL, NULL, &callId);
+	if (status != PJ_SUCCESS) error_exit("Error starting pjsua", status);
 }
 
 sipCore::~sipCore()
@@ -78,6 +105,7 @@ sipCore::~sipCore()
 
 int sipCore::init()
 {
+	emit addNewBuddy(BUDDY_URI, BUDDY_URI);
 	return 1;
 };
 
@@ -108,6 +136,8 @@ int sipCore::createTransport()
 
 	pj_status_t status = pjsua_transport_create(PJSIP_TRANSPORT_UDP, &transportConfig, NULL);
 
+
+	if (status == 130048) error_exit("Cannot create transport: may be port, using by this program, is busy!",status);
 	if (status != PJ_SUCCESS) error_exit("Error creating transport", status);
 
 	free(address); // TODO: needs or not?
@@ -125,7 +155,6 @@ char * copyString(char * string)
 int sipCore::registerToServer()
 {
 	pjsua_acc_config cfg;
-
 	QSettings settings("registerInformation.ini", QSettings::IniFormat);
 	settings.setIniCodec(QTextCodec::codecForName("UTF-8"));
 
@@ -141,32 +170,34 @@ int sipCore::registerToServer()
 
 	cfg.id = pj_str(copyString(settings.value("id", "sip:" SIP_USER "@" SIP_DOMAIN).toString().toAscii().data()));
 
-	
+
+
 	cfg.reg_uri = pj_str(copyString(settings.value("uri", "sip:" SIP_DOMAIN).toString().toAscii().data()));
 	cfg.cred_count = 1;
 	//cfg.cred_info[0].realm.ptr = settings.value("uri", SIP_DOMAIN).toString().toAscii().data();
 	//cfg.cred_info[0].realm.slen = strlen(cfg.cred_info[0].realm.ptr);
-	cfg.cred_info[0].realm = pj_str(copyString(settings.value("uri", SIP_DOMAIN).toString().toAscii().data()));
+//	cfg.cred_info[0].realm = pj_str(copyString(settings.value("uri", SIP_DOMAIN).toString().toAscii().data()));
 
 	//stupid way to do like this. Much more easier to do
 	//cfg.cred_info[0].realm = pj_str(settings.value("uri", SIP_DOMAIN).toString().toAscii().data());
 	//too sad that i saw it too late 
 	// :,(
 	//shit...
-	
+	cfg.cred_info[0].realm = pj_str(REALM);
 	cfg.cred_info[0].scheme = pj_str("digest");   ////////////////////////////////////////////////////////////////////////// ??????????????????
 	//cfg.cred_info[0].username.ptr = settings.value("username", SIP_USER).toString().toAscii().data();
 	//cfg.cred_info[0].username.slen = strlen(cfg.cred_info[0].username.ptr);
 	cfg.cred_info[0].username = pj_str(copyString(settings.value("username", SIP_USER).toString().toAscii().data()));
 	cfg.cred_info[0].data_type = PJSIP_CRED_DATA_PLAIN_PASSWD;	////////////////////////////////////////////////////////////////////////// ????????????????
 	cfg.cred_info[0].data = pj_str(copyString(settings.value("password", SIP_PASSWD).toString().toAscii().data()));
-	
 	pj_status_t status = pjsua_acc_add(&cfg, PJ_TRUE, &acc_id);
 	if (status != PJ_SUCCESS) error_exit("Error adding account", status);
+//	status = pjsua_acc_set_transport(acc_id, cfg.transport_id);
+//	if (status != PJ_SUCCESS) error_exit("Error adding account", status);
 	return 1; // TODO: нужно ли очищать память? или она ещё пригодится?
 }
 
-void sipCore::addBuddy()
+void sipCore::addBuddies()
 {
 	QSettings settings("buddies.ini", QSettings::IniFormat);
 	settings.setIniCodec(QTextCodec::codecForName("UTF-8"));
@@ -180,6 +211,8 @@ void sipCore::addBuddy()
 		buddyConfig.uri = pj_str(BUDDY_URI);
 		buddyConfig.user_data = NULL;
 		
+		//emit addNewBuddy(BUDDY_URI, BUDDY_URI);
+
 		pj_status_t status = pjsua_buddy_add(&buddyConfig, &ids[0]);
 		if (status != PJ_SUCCESS) error_exit("Error! cannot add one buddy :(", status);
 	}
@@ -198,9 +231,24 @@ void sipCore::addBuddy()
 	}
 }
 
-void sipCore::on_call_media_state(pjsua_call_id call_id) { }
+void sipCore::on_call_media_state(pjsua_call_id call_id)
+{
+	printf(" on_call_media_state called ");
 
-void sipCore::on_call_state(pjsua_call_id call_id, pjsip_event *e) { }
+	pjsua_call_info ci;
+	pjsua_call_get_info(call_id, &ci);
+	if (ci.media_status == PJSUA_CALL_MEDIA_ACTIVE)
+	{
+		pjsua_conf_connect(ci.conf_slot, 0);
+		pjsua_conf_connect(0, ci.conf_slot);
+	}
+
+}
+
+void sipCore::on_call_state(pjsua_call_id call_id, pjsip_event * e)
+{
+	printf(" on_call_state called");
+}
 
 void sipCore::on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rdata)
 {
@@ -215,4 +263,34 @@ void sipCore::on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip
 		w->setCallId(call_id);
 		w->show();
 	}
+	//((qt * ) mainWindow)->bbb(acc_id,call_id,rdata);
+
+
+/*	pjmedia_aud_dev_info * audioDevices = new pjmedia_aud_dev_info[100];
+	unsigned int numOfAudioDevices = 100;
+	pj_status_t status = pjsua_enum_aud_devs(audioDevices, &numOfAudioDevices);
+	if (status != PJ_SUCCESS) error_exit("Error starting pjsua", status);
+
+
+
+	int captureDevice = 1, playbackDevice = 2;
+
+	status = pjsua_get_snd_dev(&captureDevice, &playbackDevice);
+	if (status != PJ_SUCCESS) error_exit("Error starting pjsua", status);
+
+
+	status = pjsua_set_snd_dev(captureDevice, playbackDevice);
+	if (status != PJ_SUCCESS) error_exit("Error starting pjsua", status);*/
+
+
+
+	/*pj_status_t*/ 
+	status = pjsua_call_answer(call_id, 200 /* what code??*/, NULL, NULL);
+	if(status != PJ_SUCCESS) error_exit("cannot answer call! ", status);
+
+}
+
+void sipCore::makeWindow(void * _mainWindow)
+{
+	 mainWindow = _mainWindow;
 }

@@ -19,8 +19,6 @@
 #include <pjmedia.h>
 #include <pjmedia-codec.h>
 
-
-
 class CallWindow : public QMainWindow
 {
 	Q_OBJECT
