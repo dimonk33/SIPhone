@@ -29,7 +29,7 @@
      </item>
     </layout>
    </widget>
-   <widget class="QPushButton" name="pushButton">
+   <widget class="QPushButton" name="callButton">
     <property name="geometry">
      <rect>
       <x>10</x>

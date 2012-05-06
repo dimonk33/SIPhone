@@ -29,6 +29,7 @@ public slots:
 	void showAboutForm();
 	void blabla(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rdata);
 	void addBuddy(char * name, char * URI);
+	void makeCall();
 };
 
 #endif // QT_H

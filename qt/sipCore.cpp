@@ -30,10 +30,10 @@ sipCore::sipCore()
 
 	// setup callbacks for application
 	void (* on_incoming_callcb)(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rx_data) = on_incoming_call;
-	cfg.cb.on_incoming_call = on_incoming_callcb;
-	void (* on_call_media_statecb)(pjsua_call_id call_id) = &this->on_call_media_state;
+	void (* on_call_media_statecb)(pjsua_call_id call_id) = on_call_media_state;
 	void (* on_call_statecb)(pjsua_call_id call_id, pjsip_event *e) = on_call_state;
 
+	cfg.cb.on_incoming_call = on_incoming_callcb;
 	cfg.cb.on_call_media_state = on_call_media_statecb;
 	cfg.cb.on_call_state = on_call_statecb;
 
@@ -89,10 +89,6 @@ sipCore::sipCore()
 
 	addBuddies();
 
-	pjsua_call_id callId;
-	pj_str_t buri = pj_str(BUDDY_URI);
-	status = pjsua_call_make_call(acc_id, &buri, 0, NULL, NULL, &callId);
-	if (status != PJ_SUCCESS) error_exit("Error starting pjsua", status);
 }
 
 sipCore::~sipCore()
@@ -231,7 +227,13 @@ void sipCore::addBuddies()
 	}
 }
 
-void sipCore::on_call_media_state(pjsua_call_id call_id)
+
+int state = 0;
+// 0 - nothing
+// 1 - try to call
+// 2 - speaking
+
+void on_call_media_state(pjsua_call_id call_id)
 {
 	printf(" on_call_media_state called ");
 
@@ -245,17 +247,35 @@ void sipCore::on_call_media_state(pjsua_call_id call_id)
 
 }
 
-void sipCore::on_call_state(pjsua_call_id call_id, pjsip_event * e)
+void on_call_state(pjsua_call_id call_id, pjsip_event * e)
 {
-	printf(" on_call_state called");
+	if(e->type == PJSIP_EVENT_TSX_STATE)
+	{
+		if(e->body.tsx_state.tsx->state == PJSIP_TSX_STATE_CALLING)
+			state = 1;
+		else if(e->body.tsx_state.tsx->state == PJSIP_TSX_STATE_TERMINATED)
+		{
+			if(e->body.tsx_state.tsx->status_code == 0x0C8) //200 - OK
+				state = 2;
+		}
+		if(e->body.tsx_state.tsx->state == PJSIP_TSX_STATE_COMPLETED && (state == 2))
+		{
+			state = 0;	//end of call
+		}
+		if(e->body.tsx_state.tsx->state == PJSIP_TSX_STATE_COMPLETED && (state == 1))
+		{
+			state = 0;  //cannot make a call 
+			pj_str_t string = e->body.tsx_state.tsx->status_text;	//error text
+		}
+	}
 }
 
-void sipCore::on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rdata)
+void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rdata)
 {
 	pjsua_acc_info caller_info;
 
 	pj_status_t status = pjsua_acc_get_info(acc_id, &caller_info);
-	if(status == PJ_SUCCESS)
+	/*if(status == PJ_SUCCESS)
 	{
 		CallWindow * w = new CallWindow();
 		w->setCallerInfo(caller_info.acc_uri.ptr);
@@ -293,4 +313,13 @@ void sipCore::on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip
 void sipCore::makeWindow(void * _mainWindow)
 {
 	 mainWindow = _mainWindow;
+}
+
+int sipCore::makeCall(char * to)
+{
+	pjsua_call_id callId;
+	pj_str_t buri = pj_str(to);
+	pj_status_t status = pjsua_call_make_call(acc_id, &buri, 0, NULL, NULL, &callId);
+	if (status != PJ_SUCCESS) error_exit("cannot make call", status);\
+	return 1;
 }

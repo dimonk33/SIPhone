@@ -24,18 +24,18 @@
 #define THIS_FILE       __FILE__
 
 #define SIP_DOMAIN      "192.168.1.9"
-#define SIP_USER        "201"
-#define SIP_PASSWD      "201"
+#define SIP_USER        "200"
+#define SIP_PASSWD      "diskonnect"
 
 
 #define PUBLIC_ADDRESS "192.168.1.9"
-#define CONFIG_PORT 5060
+#define CONFIG_PORT 5065
 
 
 #define POOL_MEMORY_CREATION 1024
 #define POOL_MEMORY_CREATION_INCREMENT 32
 
-#define BUDDY_URI "sip:200@192.168.1.9"
+#define BUDDY_URI "sip:201@192.168.1.9"
 
 #define FILE_CONFIG_ACCOUNT_SETTINGS "account.inf"
 #define REALM "asterisk"
@@ -44,7 +44,7 @@ static void error_exit(const char *title, pj_status_t status)
 {
 	pjsua_perror(THIS_FILE, title, status);
 	pjsua_destroy();
-	exit(1);
+	exit(status);
 }
 
 class sipCore: public QObject
@@ -65,22 +65,25 @@ public:
 
 
 	//how to make it non-static
-	static void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rdata);
-	static void on_call_media_state(pjsua_call_id call_id);
-	static void on_call_state(pjsua_call_id call_id, pjsip_event *e);
+
 
 	int createTransport();
 	int registerToServer();
 	void addBuddies();
+	int makeCall(char * to);
+
 
 	void addBuddy(char * name, char * icon);
+
 
 signals:
 	void son_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rdata);
 	void addNewBuddy(char *, char *);
 };
 
-
+void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rdata);
+void on_call_media_state(pjsua_call_id call_id);
+void on_call_state(pjsua_call_id call_id, pjsip_event *e);
 
 
 
