@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>392</width>
-    <height>624</height>
+    <width>366</width>
+    <height>618</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -68,13 +68,39 @@
      <string>Options</string>
     </property>
    </widget>
+   <widget class="QLabel" name="label">
+    <property name="geometry">
+     <rect>
+      <x>30</x>
+      <y>10</y>
+      <width>101</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>registration status:</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="registerStatus">
+    <property name="geometry">
+     <rect>
+      <x>160</x>
+      <y>10</y>
+      <width>111</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>not registered</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>392</width>
+     <width>366</width>
      <height>21</height>
     </rect>
    </property>

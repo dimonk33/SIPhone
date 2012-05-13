@@ -1,15 +1,28 @@
 #include "sipCore.h"
 
 #include "qt.h"
+
 sipCore::sipCore()
 {
 
 	//initializing members of class
 	ids = NULL;
 	numberOfBuddies = 0;
+	object = this;
+	
+}
 
-
+sipCore::~sipCore()
+{
+	//подумать, что надо закрыть и т.д.
 	pj_status_t status;
+	status = pjsua_destroy();
+	if (status != PJ_SUCCESS) error_exit("Error destrioy pjsua!", status);
+}
+
+int sipCore::init()
+{
+		pj_status_t status;
 	status = pjsua_create();
 	if(status != PJ_SUCCESS)	error_exit("cannot create pjsua!", status);
 
@@ -32,10 +45,17 @@ sipCore::sipCore()
 	void (* on_incoming_callcb)(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rx_data) = on_incoming_call;
 	void (* on_call_media_statecb)(pjsua_call_id call_id) = on_call_media_state;
 	void (* on_call_statecb)(pjsua_call_id call_id, pjsip_event *e) = on_call_state;
+	void (* on_reg_state2cb)(pjsua_acc_id acc_id, pjsua_reg_info *info) = on_reg_state2;
+	void (* on_call_transfer_statuscb)(pjsua_call_id call_id, int st_code, const pj_str_t *st_text, pj_bool_t final, pj_bool_t *p_cont) = on_call_transfer_status;
+	void (* on_buddy_statecb)(pjsua_buddy_id buddy_id) = ::on_buddy_state;
+
 
 	cfg.cb.on_incoming_call = on_incoming_callcb;
 	cfg.cb.on_call_media_state = on_call_media_statecb;
 	cfg.cb.on_call_state = on_call_statecb;
+	cfg.cb.on_reg_state2 = on_reg_state2cb;
+	cfg.cb.on_call_transfer_status = on_call_transfer_statuscb;
+	cfg.cb.on_buddy_state = on_buddy_statecb;
 
 	status = pjsua_init(&cfg, &log_cfg, &media_cfg);
 	if (status != PJ_SUCCESS) error_exit("cannot initialize pjsua!", status);
@@ -48,8 +68,6 @@ sipCore::sipCore()
 	if (status != PJ_SUCCESS) error_exit("Error starting pjsua", status);
 
 	registerToServer();
-
-
 
 	/*pjmedia_aud_dev_info * audioDevices = new pjmedia_aud_dev_info[100];
 	unsigned int numOfAudioDevices = 100;
@@ -89,19 +107,8 @@ sipCore::sipCore()
 
 	addBuddies();
 
-}
-
-sipCore::~sipCore()
-{
-	//подумать, что надо закрыть и т.д.
-	pj_status_t status;
-	status = pjsua_destroy();
-	if (status != PJ_SUCCESS) error_exit("Error destrioy pjsua!", status);
-}
-
-int sipCore::init()
-{
-	emit addNewBuddy(BUDDY_URI, BUDDY_URI);
+//	emit addNewBuddy(BUDDY_URI, BUDDY_URI);
+	status = pjsua_buddy_update_pres(ids[0]);
 	return 1;
 };
 
@@ -198,16 +205,17 @@ void sipCore::addBuddies()
 	QSettings settings("buddies.ini", QSettings::IniFormat);
 	settings.setIniCodec(QTextCodec::codecForName("UTF-8"));
 
-	int numberOfBuddies = settings.value("numberOfBuddies", 0).toInt();
+	numberOfBuddies = settings.value("numberOfBuddies", 0).toInt();
 	pjsua_buddy_config buddyConfig;
 	
 	if(numberOfBuddies == 0)
 	{
+		numberOfBuddies = 1;
 		ids = new pjsua_buddy_id[1];
 		buddyConfig.uri = pj_str(BUDDY_URI);
 		buddyConfig.user_data = NULL;
 		
-		//emit addNewBuddy(BUDDY_URI, BUDDY_URI);
+		emit addNewBuddy(BUDDY_URI, BUDDY_URI);
 
 		pj_status_t status = pjsua_buddy_add(&buddyConfig, &ids[0]);
 		if (status != PJ_SUCCESS) error_exit("Error! cannot add one buddy :(", status);
@@ -223,15 +231,75 @@ void sipCore::addBuddies()
 			pj_status_t status = pjsua_buddy_add(&buddyConfig, &ids[i]);
 			if (status != PJ_SUCCESS) error_exit("Error! cannot add buddy", status);
 
+			emit addNewBuddy(BUDDY_URI, BUDDY_URI);//////////////
+		}
+	}
+	for (int i = 0; i < numberOfBuddies; i++)
+	{
+		pj_status_t status = pjsua_buddy_subscribe_pres	(ids[i], 1);		
+		if (status != PJ_SUCCESS)
+		{
+			printf("cannot subcsribe!");
 		}
 	}
 }
 
+void sipCore::makeWindow(void * _mainWindow)
+{
+	 mainWindow = _mainWindow;
+}
 
-int state = 0;
-// 0 - nothing
-// 1 - try to call
-// 2 - speaking
+int sipCore::makeCall(char * to)
+{
+	pjsua_call_id callId;
+	pj_str_t buri = pj_str(to);
+	pj_status_t status = pjsua_call_make_call(acc_id, &buri, 0, NULL, NULL, &callId);
+	if (status != PJ_SUCCESS) error_exit("cannot make call", status);
+
+	CallWindow * window = new CallWindow(NULL);
+	window->setCallerInfo(to);
+	window->setCallId(callId);
+	window->setStatusInfo("calling...");
+	window->hideAnswerButton();
+	window->show();
+
+	return 1;
+}
+
+sipCore * sipCore::getObject()
+{
+	return object;
+}
+
+void sipCore::on_buddy_state(pjsua_buddy_id buddy_id)
+{
+	if(numberOfBuddies == 0) return;
+	int number = 0;
+	for(int number = 0; number < numberOfBuddies; number++)
+	{
+		if(ids[number] == buddy_id) break;
+	}
+	if(number == numberOfBuddies)
+	{
+		printf("error! cannot find buddy!!!");
+		exit(-5);
+	}
+
+	pjsua_buddy_info info;
+	pjsua_buddy_get_info(buddy_id, &info);
+
+	emit son_buddy_status_change(number, (info.status == PJSUA_BUDDY_STATUS_UNKNOWN)  ? 2 : (info.status == PJSUA_BUDDY_STATUS_ONLINE ? 1 : 0) );
+}
+
+void on_call_transfer_status(pjsua_call_id call_id, int st_code, const pj_str_t *st_text, pj_bool_t final, pj_bool_t *p_cont)
+{
+	printf("!!!");
+}
+
+void on_buddy_state(pjsua_buddy_id buddy_id)
+{
+	sipCore::object->on_buddy_state(buddy_id);
+}
 
 void on_call_media_state(pjsua_call_id call_id)
 {
@@ -252,29 +320,33 @@ void on_call_state(pjsua_call_id call_id, pjsip_event * e)
 	if(e->type == PJSIP_EVENT_TSX_STATE)
 	{
 		if(e->body.tsx_state.tsx->state == PJSIP_TSX_STATE_CALLING)
-			state = 1;
+			sipCore::object->status.callStatus = 1;
 		else if(e->body.tsx_state.tsx->state == PJSIP_TSX_STATE_TERMINATED)
 		{
 			if(e->body.tsx_state.tsx->status_code == 0x0C8) //200 - OK
-				state = 2;
+				sipCore::object->status.callStatus = 2;
 		}
-		if(e->body.tsx_state.tsx->state == PJSIP_TSX_STATE_COMPLETED && (state == 2))
+		if(e->body.tsx_state.tsx->state == PJSIP_TSX_STATE_COMPLETED && (sipCore::object->status.callStatus == 2))
 		{
-			state = 0;	//end of call
+			sipCore::object->status.callStatus = 0;	//end of call
+			sipCore::object->on_call_ended();
 		}
-		if(e->body.tsx_state.tsx->state == PJSIP_TSX_STATE_COMPLETED && (state == 1))
+		if(e->body.tsx_state.tsx->state == PJSIP_TSX_STATE_COMPLETED && (sipCore::object->status.callStatus == 1))
 		{
-			state = 0;  //cannot make a call 
-			pj_str_t string = e->body.tsx_state.tsx->status_text;	//error text
+			sipCore::object->status.callStatus = -1;  //cannot make a call 
+			sipCore::object->status.lastError = e->body.tsx_state.tsx->status_text;	//error text
+			sipCore::object->on_call_ended();
 		}
 	}
 }
 
 void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rdata)
 {
-	pjsua_acc_info caller_info;
-
-	pj_status_t status = pjsua_acc_get_info(acc_id, &caller_info);
+/*
+// 	pjsua_acc_info caller_info;
+// 
+// 	pj_status_t status = pjsua_acc_get_info(acc_id, &caller_info);
+*/
 	/*if(status == PJ_SUCCESS)
 	{
 		CallWindow * w = new CallWindow();
@@ -305,21 +377,14 @@ void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data 
 
 
 	/*pj_status_t*/ 
-	status = pjsua_call_answer(call_id, 200 /* what code??*/, NULL, NULL);
-	if(status != PJ_SUCCESS) error_exit("cannot answer call! ", status);
-
+/*
+// 	status = pjsua_call_answer(call_id, 200 / * what code??* /, NULL, NULL);
+// 	if(status != PJ_SUCCESS) error_exit("cannot answer call! ", status);
+*/
+	sipCore::object->incom(acc_id, call_id, rdata);
 }
 
-void sipCore::makeWindow(void * _mainWindow)
+void on_reg_state2(pjsua_acc_id acc_id, pjsua_reg_info *info)
 {
-	 mainWindow = _mainWindow;
-}
-
-int sipCore::makeCall(char * to)
-{
-	pjsua_call_id callId;
-	pj_str_t buri = pj_str(to);
-	pj_status_t status = pjsua_call_make_call(acc_id, &buri, 0, NULL, NULL, &callId);
-	if (status != PJ_SUCCESS) error_exit("cannot make call", status);\
-	return 1;
+	sipCore::object->on_reg_state2_emit(acc_id, info);
 }

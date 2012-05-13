@@ -30,6 +30,11 @@ public:
 	void setStatusInfo(char * statusInfo);
 	void setCallId(pjsua_call_id _callId);
 	pjsua_call_id getCallId();
+	void hideAnswerButton();
+	void showAnswerButton();
+
+
+	int status;
 
 private:
 	Ui::callForm ui;
@@ -38,6 +43,7 @@ private:
 public slots:
 	void answerButtonPressed();
 	void hangUpButtonPressed();
+	void on_call_end_slot();
 };
 
 #endif
