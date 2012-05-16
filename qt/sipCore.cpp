@@ -1,5 +1,4 @@
 #include "sipCore.h"
-
 #include "qt.h"
 
 sipCore::sipCore()
@@ -22,7 +21,7 @@ sipCore::~sipCore()
 
 int sipCore::init()
 {
-		pj_status_t status;
+	pj_status_t status;
 	status = pjsua_create();
 	if(status != PJ_SUCCESS)	error_exit("cannot create pjsua!", status);
 
@@ -104,6 +103,7 @@ int sipCore::init()
 	//TODO: add one or more buddies 
 
 	//TODO: configure sound device,	codec settings, and other media settings
+	load_devices();
 
 	addBuddies();
 
@@ -129,13 +129,12 @@ int sipCore::createTransport()
 	//transportConfig.qos_params = ????
 	//transportConfig.qos_type = ???
 
-	//transportConfig.public_addr.ptr = settings.value("public_address", PUBLIC_ADDRESS).toString().toAscii().data();
-	//transportConfig.public_addr.slen = strlen(transportConfig.public_addr.ptr);
-	int size = strlen(settings.value("public_address", PUBLIC_ADDRESS).toString().toAscii().data()) + 1;
-	char * address = (char*)malloc(sizeof(char) * size);
-	memcpy(address, settings.value("public_address", PUBLIC_ADDRESS).toString().toAscii().data(), size);
-	transportConfig.public_addr = pj_str(address);
-	transportConfig.port = settings.value("port", CONFIG_PORT).toInt();
+	config.publicAddress = copyString(settings.value("public_address", PUBLIC_ADDRESS).toString().toAscii().data());
+
+	transportConfig.public_addr = pj_str(config.publicAddress);
+
+	config.portNumber = settings.value("port", CONFIG_PORT).toInt();
+	transportConfig.port = config.portNumber;
 
 	pj_status_t status = pjsua_transport_create(PJSIP_TRANSPORT_UDP, &transportConfig, NULL);
 
@@ -143,7 +142,7 @@ int sipCore::createTransport()
 	if (status == 130048) error_exit("Cannot create transport: may be port, using by this program, is busy!",status);
 	if (status != PJ_SUCCESS) error_exit("Error creating transport", status);
 
-	free(address); // TODO: needs or not?
+//	free(address); // TODO: needs or not?
 	return 1;
 }
 
@@ -163,41 +162,114 @@ int sipCore::registerToServer()
 
 	pjsua_acc_config_default(&cfg);
 
+	config.id = copyString(settings.value("id", "sip:" SIP_USER "@" SIP_DOMAIN).toString().toAscii().data());
+	config.uri = copyString(settings.value("uri", "sip:" SIP_DOMAIN).toString().toAscii().data());
+	config.realm = copyString(settings.value("realm", REALM).toString().toAscii().data());
+	config.sipUser = copyString(settings.value("username", SIP_USER).toString().toAscii().data());
+	config.sipPassword = copyString(settings.value("password", SIP_PASSWD).toString().toAscii().data());
 
-	//cfg.id.ptr = settings.value("id", "sip:" SIP_USER "@" SIP_DOMAIN).toString().toAscii().data();
-	//cfg.id.slen = strlen(cfg.id.ptr);
-
-//	int size = strlen(settings.value("id", "sip:" SIP_USER "@" SIP_DOMAIN).toString().toAscii().data()) + 1;
-//	char * temp = (char*)malloc(sizeof(char) * size);
-//	memcpy(temp, settings.value("id", "sip:" SIP_USER "@" SIP_DOMAIN).toString().toAscii().data(), size);
-
-	cfg.id = pj_str(copyString(settings.value("id", "sip:" SIP_USER "@" SIP_DOMAIN).toString().toAscii().data()));
-
-
-
-	cfg.reg_uri = pj_str(copyString(settings.value("uri", "sip:" SIP_DOMAIN).toString().toAscii().data()));
+	cfg.id = pj_str(config.id);
+	cfg.reg_uri = pj_str(config.uri);
 	cfg.cred_count = 1;
-	//cfg.cred_info[0].realm.ptr = settings.value("uri", SIP_DOMAIN).toString().toAscii().data();
-	//cfg.cred_info[0].realm.slen = strlen(cfg.cred_info[0].realm.ptr);
-//	cfg.cred_info[0].realm = pj_str(copyString(settings.value("uri", SIP_DOMAIN).toString().toAscii().data()));
 
-	//stupid way to do like this. Much more easier to do
-	//cfg.cred_info[0].realm = pj_str(settings.value("uri", SIP_DOMAIN).toString().toAscii().data());
-	//too sad that i saw it too late 
-	// :,(
-	//shit...
-	cfg.cred_info[0].realm = pj_str(REALM);
+	cfg.cred_info[0].realm = pj_str(config.realm);
 	cfg.cred_info[0].scheme = pj_str("digest");   ////////////////////////////////////////////////////////////////////////// ??????????????????
 	//cfg.cred_info[0].username.ptr = settings.value("username", SIP_USER).toString().toAscii().data();
 	//cfg.cred_info[0].username.slen = strlen(cfg.cred_info[0].username.ptr);
-	cfg.cred_info[0].username = pj_str(copyString(settings.value("username", SIP_USER).toString().toAscii().data()));
-	cfg.cred_info[0].data_type = PJSIP_CRED_DATA_PLAIN_PASSWD;	////////////////////////////////////////////////////////////////////////// ????????????????
-	cfg.cred_info[0].data = pj_str(copyString(settings.value("password", SIP_PASSWD).toString().toAscii().data()));
+	cfg.cred_info[0].username = pj_str(config.sipUser);
+	cfg.cred_info[0].data_type = PJSIP_CRED_DATA_PLAIN_PASSWD;
+	cfg.cred_info[0].data = pj_str(config.sipPassword);
+
 	pj_status_t status = pjsua_acc_add(&cfg, PJ_TRUE, &acc_id);
 	if (status != PJ_SUCCESS) error_exit("Error adding account", status);
-//	status = pjsua_acc_set_transport(acc_id, cfg.transport_id);
-//	if (status != PJ_SUCCESS) error_exit("Error adding account", status);
 	return 1; // TODO: нужно ли очищать память? или она ещё пригодится?
+}
+
+void sipCore::load_devices()
+{
+	int captureDevice, playbackDevice;
+
+	pjmedia_aud_dev_info * audioDevices = new pjmedia_aud_dev_info[100];
+	unsigned int numOfAudioDevices = 100;
+	pj_status_t status = pjsua_enum_aud_devs(audioDevices, &numOfAudioDevices);
+	if (status != PJ_SUCCESS) error_exit("Error getting sound devices", status);
+
+	status = pjsua_get_snd_dev(&captureDevice, &playbackDevice);
+	if (status != PJ_SUCCESS) error_exit("Error starting pjsua", status);
+
+	captureDevice = abs(captureDevice);
+	playbackDevice = abs(playbackDevice);
+
+	QSettings settings("devices.ini", QSettings::IniFormat);
+	settings.setIniCodec(QTextCodec::codecForName("UTF-8"));
+
+	char * inputDevice = copyString(settings.value("inputDevice", NULL).toString().toAscii().data());
+	if(inputDevice == NULL)
+	{
+		settings.setValue("inputDevice", audioDevices[captureDevice].name);
+		inputDevice = copyString(audioDevices[captureDevice].name);
+	}
+	else
+	{
+		int i;
+		for(i = 0; i < numOfAudioDevices; i++)
+			if(strcmp(inputDevice, audioDevices[i].name) == 0)
+			{
+				captureDevice = i;
+				break;
+			}
+		if( i == numOfAudioDevices)
+		{
+			QMessageBox::information(NULL, "Warning", "Capture device not found. Using standart device");
+			inputDevice = copyString(audioDevices[captureDevice].name);
+			settings.setValue("inputDevice", audioDevices[captureDevice].name);
+		}
+	}
+
+	char * outputDevice = copyString(settings.value("outputDevice", NULL).toString().toAscii().data());
+	if(outputDevice == NULL)
+	{
+		settings.setValue("outputDevice", audioDevices[playbackDevice].name);
+		outputDevice = copyString(audioDevices[playbackDevice].name);
+	}
+	else
+	{
+		int i;
+		for(i = 0; i < numOfAudioDevices; i++)
+			if(strcmp(outputDevice, audioDevices[i].name) == 0)
+			{
+				playbackDevice = i;
+				break;
+			}
+		if( i == numOfAudioDevices)
+		{
+			QMessageBox::information(NULL, "Warning", "Playback device not found. Using standart device");
+			outputDevice = copyString(audioDevices[playbackDevice].name);
+			settings.setValue("outputDevice", audioDevices[playbackDevice].name);
+		}
+	
+	}
+		
+	status = pjsua_set_snd_dev(captureDevice, playbackDevice);
+	if (status != PJ_SUCCESS) error_exit("Error starting pjsua", status);
+	config.inputDevice = inputDevice;
+	config.outputDevice = outputDevice;
+}
+
+void sipCore::saveDevices(char * inputDevice, char * outputDevice)
+{
+	QSettings settings("devices.ini", QSettings::IniFormat);
+	settings.setIniCodec(QTextCodec::codecForName("UTF-8"));
+
+	if(inputDevice != NULL)
+	{
+		settings.setValue("inputDevice", inputDevice);
+	}
+
+	if(outputDevice != NULL)
+	{
+		settings.setValue("outputDevice", outputDevice);
+	}
 }
 
 void sipCore::addBuddies()
@@ -215,23 +287,28 @@ void sipCore::addBuddies()
 		buddyConfig.uri = pj_str(BUDDY_URI);
 		buddyConfig.user_data = NULL;
 		
-		emit addNewBuddy(BUDDY_URI, BUDDY_URI);
+		emit addNewBuddy("numberoUno", BUDDY_URI);
 
 		pj_status_t status = pjsua_buddy_add(&buddyConfig, &ids[0]);
 		if (status != PJ_SUCCESS) error_exit("Error! cannot add one buddy :(", status);
+		settings.setValue("numberOfBuddies", 1);
+		settings.setValue("buddy0", BUDDY_URI);
+		settings.setValue("buddy0.name", "numberoUno");
 	}
 	else
 	{
 		ids = new pjsua_buddy_id[numberOfBuddies];
 		for(int i = 0; i < numberOfBuddies; i++)
 		{
-			buddyConfig.uri = pj_str(settings.value(QString("buddy%d").arg(i)).toByteArray().data());
+			QByteArray ba = (settings.value(QString("buddy%1").arg(i))).toByteArray();
+			buddyConfig.uri = pj_str(ba.data());
 			buddyConfig.user_data = NULL;
 					
 			pj_status_t status = pjsua_buddy_add(&buddyConfig, &ids[i]);
 			if (status != PJ_SUCCESS) error_exit("Error! cannot add buddy", status);
 
-			emit addNewBuddy(BUDDY_URI, BUDDY_URI);//////////////
+			ba = (settings.value(QString("buddy%1.name").arg(i))).toByteArray();
+			emit addNewBuddy(ba.data(), BUDDY_URI);//////////////
 		}
 	}
 	for (int i = 0; i < numberOfBuddies; i++)
@@ -242,11 +319,6 @@ void sipCore::addBuddies()
 			printf("cannot subcsribe!");
 		}
 	}
-}
-
-void sipCore::makeWindow(void * _mainWindow)
-{
-	 mainWindow = _mainWindow;
 }
 
 int sipCore::makeCall(char * to)
@@ -264,11 +336,6 @@ int sipCore::makeCall(char * to)
 	window->show();
 
 	return 1;
-}
-
-sipCore * sipCore::getObject()
-{
-	return object;
 }
 
 void sipCore::on_buddy_state(pjsua_buddy_id buddy_id)
@@ -289,6 +356,97 @@ void sipCore::on_buddy_state(pjsua_buddy_id buddy_id)
 	pjsua_buddy_get_info(buddy_id, &info);
 
 	emit son_buddy_status_change(number, (info.status == PJSUA_BUDDY_STATUS_UNKNOWN)  ? 2 : (info.status == PJSUA_BUDDY_STATUS_ONLINE ? 1 : 0) );
+}
+
+void sipCore::addContact(char * name, char * URI)
+{
+	QSettings settings("buddies.ini", QSettings::IniFormat);
+	settings.setIniCodec(QTextCodec::codecForName("UTF-8"));
+
+	numberOfBuddies = settings.value("numberOfBuddies", 0).toInt();
+	pjsua_buddy_config buddyConfig;
+
+	pjsua_buddy_id * newIds = new pjsua_buddy_id[numberOfBuddies + 1];
+	for(int i = 0; i < numberOfBuddies; i++)
+	{
+		newIds[i] = ids[i];
+	}
+
+	buddyConfig.uri = pj_str(URI);
+	buddyConfig.user_data = NULL;
+
+	pj_status_t status = pjsua_buddy_add(&buddyConfig, &newIds[numberOfBuddies]);
+	if (status != PJ_SUCCESS) error_exit("Error! cannot add buddy", status);
+	delete[] ids;
+	ids = newIds;
+	numberOfBuddies++;
+	emit addNewBuddy(name, URI); 
+
+	settings.setValue("numberOfBuddies", numberOfBuddies);
+	settings.setValue(QString("buddy%1").arg(numberOfBuddies - 1), URI);
+	settings.setValue(QString("buddy%1.name").arg(numberOfBuddies - 1), name);
+}
+
+void sipCore::deleteContact(int row)
+{
+	if(row > numberOfBuddies)
+	{
+		printf("Eror! row > nubmerOfBuddies");
+		return;
+	}
+
+	QSettings settings("buddies.ini", QSettings::IniFormat);
+	settings.setIniCodec(QTextCodec::codecForName("UTF-8"));
+
+	pjsua_buddy_config buddyConfig;
+	pjsua_buddy_id * newIds = new pjsua_buddy_id[numberOfBuddies - 1];
+	int i;
+	for(i = 0 ; i < row; i++)
+		newIds[i] = ids[i];
+	for(; i < numberOfBuddies - 1; i++)
+	{
+		settings.setValue(QString("buddy%1").arg(i), settings.value(QString("buddy%1").arg(i+1)));
+		settings.setValue(QString("buddy%1.name").arg(i), settings.value(QString("buddy%1.name").arg(i+1)));
+		newIds[i] = ids[i+1];
+	}
+	pj_status_t status = pjsua_buddy_del(ids[row]);
+	if(status != PJ_SUCCESS) printf("error! cannot delete buddy");
+	delete[] ids;
+
+	ids = newIds;
+	numberOfBuddies--;
+
+	settings.setValue("numberOfBuddies", numberOfBuddies);
+
+
+}
+
+char * sipCore::getBuddyURI(int row)
+{
+	pjsua_buddy_info info;
+	pjsua_buddy_get_info(ids[row], &info);
+	char * returnString = (char*)malloc(info.uri.slen + 1);
+	memcpy(returnString, info.uri.ptr, info.uri.slen);
+	returnString[info.uri.slen] = 0;
+	return returnString;
+}
+
+void sipCore::editContact(int row, char* name, char * URI)
+{
+	QSettings settings("buddies.ini", QSettings::IniFormat);
+	settings.setIniCodec(QTextCodec::codecForName("UTF-8"));
+
+
+	settings.setValue(QString("buddy%1").arg(row), URI);
+	settings.setValue(QString("buddy%1.name").arg(row), name);
+}
+
+void sipCore::saveConfig(config_struct * newConfig)
+{
+	QSettings transportSettings("transport.ini", QSettings::IniFormat);
+	transportSettings.setIniCodec(QTextCodec::codecForName("UTF-8"));
+
+
 }
 
 void on_call_transfer_status(pjsua_call_id call_id, int st_code, const pj_str_t *st_text, pj_bool_t final, pj_bool_t *p_cont)

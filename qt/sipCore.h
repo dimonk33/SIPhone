@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include <pjlib.h>
 #include <pjlib-util.h>
@@ -17,6 +18,7 @@
 
 #include <qsettings.h>
 #include <QTextCodec.h>
+#include <QMessageBox>
 
 #include "callWindow.h"
 //#include "globals.h"
@@ -54,6 +56,20 @@ struct statuses
 	pj_str_t lastError;
 };
 
+struct config_struct
+{
+	char * sipDomain;
+	char * sipUser;
+	char * sipPassword;
+	char * publicAddress;
+	char * id; // sip:user@domain
+	int portNumber;
+	char * uri;
+	char * realm;
+	char * inputDevice;
+	char * outputDevice;
+};
+
 enum CALL_STATUSES
 {
 	// 0 - nothing
@@ -77,18 +93,21 @@ class sipCore: public QObject
 public:
 	static sipCore * object;
 	statuses status;
+	config_struct config;
 public:
 	sipCore();
 	~sipCore();
 	int init();
 	void load_config();	//not used yet
-	void makeWindow(void * _mainWindow); // not used
-	sipCore * getObject();	//not used
+	void saveConfig(config_struct * newConfig);
+
+	void saveDevices(char * inputDevice, char * outputDevice);
 
 	//how to make it non-static
 
 	int createTransport();
 	int registerToServer();
+	void load_devices();
 	void addBuddies();
 	int makeCall(char * to);
 
@@ -101,6 +120,11 @@ public:
 	void on_reg_state2_emit(pjsua_acc_id acc_id, pjsua_reg_info *info)	{ emit son_reg_state2(acc_id, info);}
 	void on_call_ended() { emit son_call_ended(); }
 	void on_buddy_state(pjsua_buddy_id buddy_id);
+	void addContact(char * name, char * URI);
+	void deleteContact(int row);
+	void editContact(int row, char * name, char * URI);
+	
+	char * getBuddyURI(int row);
 
 signals:
 	void son_incoming_call(int acc_id, int call_id, void * rdata);
@@ -109,6 +133,8 @@ signals:
 	void son_call_ended();
 	void son_buddy_status_change(int row, int status);
 };
+
+char * copyString(char *);
 
 void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rdata);
 void on_call_media_state(pjsua_call_id call_id);

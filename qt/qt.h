@@ -6,6 +6,9 @@
 #include "ui_qt.h"
 #include "sipCore.h"
 #include "aboutForm.h"
+#include "addUserForm.h"
+#include "optionsForm.h"
+#include <QSettings>
 
 class qt : public QMainWindow
 {
@@ -31,9 +34,15 @@ public slots:
 	void on_incoming_call_slot(int acc_id, int call_id, void * rdata);
 	void addBuddy(char * name, char * URI);
 	void makeCall();
+	void addContact();
+	void deleteContact();
+	void editContact();
+	void showHelp();
 	void on_reg_state2_slot(pjsua_acc_id acc_id, pjsua_reg_info *info);
 	void on_buddy_state_change(int row, int status);
 	void on_exit();
+	void showOptions();
+	
 };
 
 #endif // QT_H

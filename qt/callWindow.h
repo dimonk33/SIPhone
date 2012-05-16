@@ -40,10 +40,10 @@ private:
 	Ui::callForm ui;
 	pjsua_call_id callId;
 
-public slots:
-	void answerButtonPressed();
-	void hangUpButtonPressed();
-	void on_call_end_slot();
+	public slots:
+		void answerButtonPressed();
+		void hangUpButtonPressed();
+		void on_call_end_slot();
 };
 
 #endif
