@@ -216,6 +216,81 @@ void qt::showOptions()
 		form.ui.outputDevices->setCurrentIndex(row);
 	else printf("Error! config.outputDevice not found in combobox!!");
 
-	form.exec();
+	while(1)
+	{
+		form.exec();
 
+		if(form.close() == -1) return;
+
+		/*
+		*** проверка на валидность данных
+		*/
+		bool success;
+		int newPort = form.ui.portNumber->text().toInt(&success);
+		if((newPort < 0 || newPort > 65536) || !success) 
+		{
+			QMessageBox::information(this, "Error", "Port number must be number in interval 0..65536");
+			continue;
+		}
+
+	//////
+		break;
+	}
+
+	
+
+	free(sipCore::object->config.inputDevice);
+	sipCore::object->config.inputDevice = fromQString(form.ui.InputDevices->currentText());
+
+	free(sipCore::object->config.outputDevice);
+	sipCore::object->config.outputDevice = fromQString(form.ui.outputDevices->currentText());
+
+	//set devices;
+
+	free(sipCore::object->config.sipUser);
+	sipCore::object->config.sipUser = fromQString(form.ui.sipUser->text());
+
+	free(sipCore::object->config.sipPassword);
+	sipCore::object->config.sipPassword = fromQString(form.ui.sipPassword->text());
+
+	bool success;
+	sipCore::object->config.portNumber = form.ui.portNumber->text().toInt(&success);
+
+	free(sipCore::object->config.publicAddress);
+	sipCore::object->config.publicAddress = fromQString(form.ui.publicAddress->text());
+
+	free(sipCore::object->config.sipDomain);
+	sipCore::object->config.sipDomain = copyString(sipCore::object->config.publicAddress);
+
+	free(sipCore::object->config.realm);
+	sipCore::object->config.realm = fromQString(form.ui.realm->text());
+
+	free(sipCore::object->config.id);
+	sipCore::object->config.id = fromQString(QString("sip:%1@%2").arg(sipCore::object->config.sipUser).arg(sipCore::object->config.publicAddress));
+
+	free(sipCore::object->config.uri);
+	sipCore::object->config.uri = fromQString(QString("sip:%1").arg(sipCore::object->config.publicAddress));
+
+//	free(sipCore::object->config.outputDevice);
+//	sipCore::object->config.outputDevice = fromQString(form.ui.outputDevices->text());
+
+/*	char * sipDomain;	//as a public address
+	char * sipUser;
+	char * sipPassword;
+	char * publicAddress; //192.168.1.9
+	char * id; // sip:user@domain
+	int portNumber;	//port
+	char * uri; //sip:domain
+	char * realm; //realm
+	char * inputDevice;
+	char * outputDevice;*/
+
+}
+
+char * fromQString(QString & string)
+{
+	QByteArray ba = string.toAscii();
+	char * retString = (char*) malloc (sizeof(char) * ba.size());
+	memcpy(retString, ba.data(), ba.size());
+	return retString;
 }

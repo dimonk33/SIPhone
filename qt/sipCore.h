@@ -58,14 +58,14 @@ struct statuses
 
 struct config_struct
 {
-	char * sipDomain;
+	char * sipDomain;	//as a public address
 	char * sipUser;
 	char * sipPassword;
-	char * publicAddress;
+	char * publicAddress; //192.168.1.9
 	char * id; // sip:user@domain
-	int portNumber;
-	char * uri;
-	char * realm;
+	int portNumber;	//port
+	char * uri; //sip:domain
+	char * realm; //realm
 	char * inputDevice;
 	char * outputDevice;
 };
@@ -135,6 +135,7 @@ signals:
 };
 
 char * copyString(char *);
+
 
 void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rdata);
 void on_call_media_state(pjsua_call_id call_id);

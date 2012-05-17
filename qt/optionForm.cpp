@@ -21,5 +21,5 @@ void optionsForm::okButtonPressed()
 
 void optionsForm::cancelButtonPressed()
 {
-	this->done(0);
+	this->done(-1);
 }

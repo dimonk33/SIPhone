@@ -45,4 +45,6 @@ public slots:
 	
 };
 
+char * fromQString(QString & string);
+
 #endif // QT_H
