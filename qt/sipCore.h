@@ -58,7 +58,6 @@ struct statuses
 
 struct config_struct
 {
-	char * sipDomain;	//as a public address
 	char * sipUser;
 	char * sipPassword;
 	char * publicAddress; //192.168.1.9
@@ -89,27 +88,29 @@ class sipCore: public QObject
 	pjsua_acc_id acc_id;
 	pjsua_buddy_id * ids;
 	int numberOfBuddies;
+	pjsua_player_id * playerId;
 
 public:
 	static sipCore * object;
 	statuses status;
 	config_struct config;
+	pjsua_call_id callId;
 public:
 	sipCore();
 	~sipCore();
 	int init();
 	void load_config();	//not used yet
-	void saveConfig(config_struct * newConfig);
+	void saveConfig();
 
 	void saveDevices(char * inputDevice, char * outputDevice);
-
-	//how to make it non-static
 
 	int createTransport();
 	int registerToServer();
 	void load_devices();
 	void addBuddies();
-	int makeCall(char * to);
+	int makeCall(int index);
+
+	void playMedia(char * fileName);
 
 
 	void addBuddy(char * name, char * icon);
@@ -123,7 +124,8 @@ public:
 	void addContact(char * name, char * URI);
 	void deleteContact(int row);
 	void editContact(int row, char * name, char * URI);
-	
+	void on_call_answered() {emit son_call_answered();}
+
 	char * getBuddyURI(int row);
 
 signals:
@@ -132,6 +134,7 @@ signals:
 	void son_reg_state2(pjsua_acc_id acc_id, pjsua_reg_info *info);
 	void son_call_ended();
 	void son_buddy_status_change(int row, int status);
+	void son_call_answered();
 };
 
 char * copyString(char *);
@@ -143,6 +146,7 @@ void on_call_state(pjsua_call_id call_id, pjsip_event *e);
 void on_reg_state2(pjsua_acc_id acc_id, pjsua_reg_info *info);
 void on_call_transfer_status(pjsua_call_id call_id, int st_code, const pj_str_t *st_text, pj_bool_t final, pj_bool_t *p_cont);
 void on_buddy_state(pjsua_buddy_id buddy_id);
+pjsip_redirect_op  on_call_redirected(pjsua_call_id call_id, const pjsip_uri *target, const pjsip_event *e);
 
 
 

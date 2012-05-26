@@ -94,6 +94,7 @@ void addUserForm::okButtonPressed()
 
 		this->hide();
 		delete this;
+		return;
 	}
 	forChanges = 1;
 	done(1);

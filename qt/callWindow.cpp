@@ -8,14 +8,15 @@ CallWindow::CallWindow(QWidget *parent, Qt::WFlags flags)
 	QObject::connect(ui.answerButton, SIGNAL(pressed()), this, SLOT(answerButtonPressed()));
 	QObject::connect(ui.hangUpButton, SIGNAL(pressed()), this, SLOT(hangUpButtonPressed()));
 	QObject::connect(sipCore::object, SIGNAL(son_call_ended()), this, SLOT(on_call_end_slot()));
+	QObject::connect(ui.keyboardButton, SIGNAL(pressed()), this, SLOT(keypad_show()));
+	QObject::connect(sipCore::object, SIGNAL(son_call_answered()), this, SLOT(call_answered()));
 	status = 0;
+	keypad = NULL;
+	setWindowFlags(Qt::CustomizeWindowHint | Qt::WindowMinimizeButtonHint);
 }
 
 CallWindow::~CallWindow()
 {
-	QObject::disconnect(ui.answerButton, SIGNAL(pressed()), this, SLOT(answerButtonPressed()));
-	QObject::disconnect(ui.hangUpButton, SIGNAL(pressed()), this, SLOT(hangUpButtonPressed()));
-	QObject::disconnect(sipCore::object, SIGNAL(son_call_ended()), this, SLOT(on_call_end_slot()));
 
 }
 
@@ -67,6 +68,8 @@ void CallWindow::hangUpButtonPressed()
 		if(status != PJ_SUCCESS) error_exit("cannot hang up call! ", status);
 	}
 	this->hide();
+	if(keypad != NULL)
+		((keypadForm*)keypad)->closeButtonPressed();
 	sipCore::object->status.callStatus = 0;
 
 	delete this;
@@ -95,4 +98,15 @@ void CallWindow::on_call_end_slot()
 	ui.hangUpButton->setText("close");
 //	this->hide();
 //	delete(this);
+}
+
+void CallWindow::call_answered()
+{
+	ui.statusLabel->setText("Speaking...");
+}
+
+void CallWindow::keypad_show()
+{
+	keypad = new keypadForm(this);
+	keypad->show();
 }

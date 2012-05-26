@@ -27,7 +27,7 @@ qt::qt(QWidget *parent, Qt::WFlags flags)
 qt::~qt()
 {
 
-}
+}	
 
 void qt::showAboutForm()
 {
@@ -71,17 +71,20 @@ void qt::makeCall()
 		QMessageBox::information(this, "Error", "Cannot make call - you are not registered to server");
 		return;
 	}
-	QList<QListWidgetItem*> selectedItems = ui.listWidget->selectedItems();
-	if(selectedItems.size() == 0)
+
+	int row = ui.listWidget->currentRow();
+	if(row == -1)
 	{
 		QMessageBox::information(this, "!!!", "Please choose abonent");
 		return;
 	}
 
-	QListWidgetItem * item = selectedItems.at(0);
+
+	/*QListWidgetItem * item = selectedItems.at(0);
 	QString address = item->text();
 	QByteArray ba = address.toLatin1();
-	core.makeCall(ba.data());
+	core.makeCall(ba.data());*/
+	core.makeCall(row);
 }
 
 void qt::on_reg_state2_slot(pjsua_acc_id acc_id, pjsua_reg_info *info)
@@ -186,6 +189,7 @@ void qt::showOptions()
 {
 	optionsForm form(this);
 
+	int changes = 0;
 	form.ui.realm->setText(sipCore::object->config.realm);
 	form.ui.publicAddress->setText(sipCore::object->config.publicAddress);
 	form.ui.portNumber->setText(QString("%1").arg(sipCore::object->config.portNumber));
@@ -216,18 +220,33 @@ void qt::showOptions()
 		form.ui.outputDevices->setCurrentIndex(row);
 	else printf("Error! config.outputDevice not found in combobox!!");
 
+	char * newInputDevice;
+	char * newOutputDevice;
+	char * newSipUser;
+	char * newSipPassword;
+	char * newRealm;
+	char * newPublicAddress;
+	int newPortNumber;
+
 	while(1)
 	{
 		form.exec();
 
 		if(form.close() == -1) return;
+		newInputDevice = fromQString(form.ui.InputDevices->currentText());
+		newOutputDevice = fromQString(form.ui.outputDevices->currentText());
+		newSipUser = fromQString(form.ui.sipUser->text());
+		newSipPassword = fromQString(form.ui.sipPassword->text());
+		newRealm = fromQString(form.ui.realm->text());
+		newPublicAddress = fromQString(form.ui.publicAddress->text());
+
+		bool success;
+		newPortNumber = form.ui.portNumber->text().toInt(&success);
 
 		/*
 		*** проверка на валидность данных
 		*/
-		bool success;
-		int newPort = form.ui.portNumber->text().toInt(&success);
-		if((newPort < 0 || newPort > 65536) || !success) 
+		if((newPortNumber < 0 || newPortNumber > 65536) || !success) 
 		{
 			QMessageBox::information(this, "Error", "Port number must be number in interval 0..65536");
 			continue;
@@ -237,60 +256,88 @@ void qt::showOptions()
 		break;
 	}
 
+	if(strcmp(newInputDevice, sipCore::object->config.inputDevice))
+	{
+		free(sipCore::object->config.inputDevice);
+		sipCore::object->config.inputDevice = newInputDevice;
+		changes++;
+	}
+
+	if(strcmp(newOutputDevice, sipCore::object->config.outputDevice))
+	{
+		free(sipCore::object->config.outputDevice);
+		sipCore::object->config.outputDevice = newOutputDevice;
+		changes++;
+	}
+
+	if(strcmp(newSipUser, sipCore::object->config.sipUser))
+	{
+		free(sipCore::object->config.sipUser);
+		sipCore::object->config.sipUser = newSipUser;
+
+		free(sipCore::object->config.id);
+		sipCore::object->config.id = fromQString(QString("sip:%1@%2").arg(sipCore::object->config.sipUser).arg(sipCore::object->config.publicAddress));
+
+		changes++;
+	}
+
+
+	if(strcmp(newSipPassword, sipCore::object->config.sipPassword))
+	{
+		free(sipCore::object->config.sipPassword);
+		sipCore::object->config.sipPassword = newSipPassword;
+		changes++;
+	}
+
+
+	if(newPortNumber != sipCore::object->config.portNumber)
+	{
+		sipCore::object->config.portNumber = newPortNumber;
+		changes++;
+	}
 	
+/*	if(strcmp(newPublicAddress, sipCore::object->config.publicAddress))
+	{
+		free(sipCore::object->config.publicAddress);
+		sipCore::object->config.publicAddress = newPublicAddress;
+		changes++;
+	}*/
 
-	free(sipCore::object->config.inputDevice);
-	sipCore::object->config.inputDevice = fromQString(form.ui.InputDevices->currentText());
 
-	free(sipCore::object->config.outputDevice);
-	sipCore::object->config.outputDevice = fromQString(form.ui.outputDevices->currentText());
+	if(strcmp(newPublicAddress, sipCore::object->config.publicAddress))
+	{
+		free(sipCore::object->config.publicAddress);
+		sipCore::object->config.publicAddress = newPublicAddress;
 
-	//set devices;
+		free(sipCore::object->config.uri);
+		sipCore::object->config.uri = fromQString(QString("sip:%1").arg(sipCore::object->config.publicAddress));
 
-	free(sipCore::object->config.sipUser);
-	sipCore::object->config.sipUser = fromQString(form.ui.sipUser->text());
+		free(sipCore::object->config.id);
+		sipCore::object->config.id = fromQString(QString("sip:%1@%2").arg(sipCore::object->config.sipUser).arg(sipCore::object->config.publicAddress));
 
-	free(sipCore::object->config.sipPassword);
-	sipCore::object->config.sipPassword = fromQString(form.ui.sipPassword->text());
 
-	bool success;
-	sipCore::object->config.portNumber = form.ui.portNumber->text().toInt(&success);
+		changes++;
+	}
 
-	free(sipCore::object->config.publicAddress);
-	sipCore::object->config.publicAddress = fromQString(form.ui.publicAddress->text());
+	if(strcmp(newRealm, sipCore::object->config.realm))
+	{
+		free(sipCore::object->config.realm);
+		sipCore::object->config.realm = newRealm;
+		changes++;
+	}
 
-	free(sipCore::object->config.sipDomain);
-	sipCore::object->config.sipDomain = copyString(sipCore::object->config.publicAddress);
-
-	free(sipCore::object->config.realm);
-	sipCore::object->config.realm = fromQString(form.ui.realm->text());
-
-	free(sipCore::object->config.id);
-	sipCore::object->config.id = fromQString(QString("sip:%1@%2").arg(sipCore::object->config.sipUser).arg(sipCore::object->config.publicAddress));
-
-	free(sipCore::object->config.uri);
-	sipCore::object->config.uri = fromQString(QString("sip:%1").arg(sipCore::object->config.publicAddress));
-
-//	free(sipCore::object->config.outputDevice);
-//	sipCore::object->config.outputDevice = fromQString(form.ui.outputDevices->text());
-
-/*	char * sipDomain;	//as a public address
-	char * sipUser;
-	char * sipPassword;
-	char * publicAddress; //192.168.1.9
-	char * id; // sip:user@domain
-	int portNumber;	//port
-	char * uri; //sip:domain
-	char * realm; //realm
-	char * inputDevice;
-	char * outputDevice;*/
-
+	if(changes != 0)
+	{
+		QMessageBox::information(this, "Changes", "Changes will be activated on next launch");
+		sipCore::object->saveConfig();
+	}
 }
 
 char * fromQString(QString & string)
 {
 	QByteArray ba = string.toAscii();
-	char * retString = (char*) malloc (sizeof(char) * ba.size());
+	char * retString = (char*) malloc (sizeof(char) * ba.size() + 1);
 	memcpy(retString, ba.data(), ba.size());
+	retString[ba.size()] = 0;
 	return retString;
 }

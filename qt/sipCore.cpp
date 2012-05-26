@@ -25,6 +25,7 @@ int sipCore::init()
 	status = pjsua_create();
 	if(status != PJ_SUCCESS)	error_exit("cannot create pjsua!", status);
 
+
 	/*pj_pool_t pool = pjsua_pool_create("pool", POOL_MEMORY_CREATION, POOL_MEMORY_CREATION_INCREMENT);
 	if( pool == NULL ) error_exit("cannot create pool!");*/
 
@@ -47,6 +48,8 @@ int sipCore::init()
 	void (* on_reg_state2cb)(pjsua_acc_id acc_id, pjsua_reg_info *info) = on_reg_state2;
 	void (* on_call_transfer_statuscb)(pjsua_call_id call_id, int st_code, const pj_str_t *st_text, pj_bool_t final, pj_bool_t *p_cont) = on_call_transfer_status;
 	void (* on_buddy_statecb)(pjsua_buddy_id buddy_id) = ::on_buddy_state;
+	pjsip_redirect_op(*  on_call_redirectedcb)(pjsua_call_id call_id, const pjsip_uri *target, const pjsip_event *e) = ::on_call_redirected;
+
 
 
 	cfg.cb.on_incoming_call = on_incoming_callcb;
@@ -55,6 +58,7 @@ int sipCore::init()
 	cfg.cb.on_reg_state2 = on_reg_state2cb;
 	cfg.cb.on_call_transfer_status = on_call_transfer_statuscb;
 	cfg.cb.on_buddy_state = on_buddy_statecb;
+	cfg.cb.on_call_redirected = on_call_redirectedcb;
 
 	status = pjsua_init(&cfg, &log_cfg, &media_cfg);
 	if (status != PJ_SUCCESS) error_exit("cannot initialize pjsua!", status);
@@ -108,7 +112,11 @@ int sipCore::init()
 	addBuddies();
 
 //	emit addNewBuddy(BUDDY_URI, BUDDY_URI);
-	status = pjsua_buddy_update_pres(ids[0]);
+//	status = pjsua_buddy_update_pres(ids[0]);
+	char buf[256];
+
+//	status = pjsua_playlist_create(&fileName, 1, &fileName, 0, NULL);
+
 	return 1;
 };
 
@@ -218,12 +226,12 @@ void sipCore::load_devices()
 				captureDevice = i;
 				break;
 			}
-		if( i == numOfAudioDevices)
-		{
-			QMessageBox::information(NULL, "Warning", "Capture device not found. Using standart device");
-			inputDevice = copyString(audioDevices[captureDevice].name);
-			settings.setValue("inputDevice", audioDevices[captureDevice].name);
-		}
+			if( i == numOfAudioDevices)
+			{
+				QMessageBox::information(NULL, "Warning", "Capture device not found. Using standart device");
+				inputDevice = copyString(audioDevices[captureDevice].name);
+				settings.setValue("inputDevice", audioDevices[captureDevice].name);
+			}
 	}
 
 	char * outputDevice = copyString(settings.value("outputDevice", NULL).toString().toAscii().data());
@@ -241,15 +249,15 @@ void sipCore::load_devices()
 				playbackDevice = i;
 				break;
 			}
-		if( i == numOfAudioDevices)
-		{
-			QMessageBox::information(NULL, "Warning", "Playback device not found. Using standart device");
-			outputDevice = copyString(audioDevices[playbackDevice].name);
-			settings.setValue("outputDevice", audioDevices[playbackDevice].name);
-		}
-	
+			if( i == numOfAudioDevices)
+			{
+				QMessageBox::information(NULL, "Warning", "Playback device not found. Using standart device");
+				outputDevice = copyString(audioDevices[playbackDevice].name);
+				settings.setValue("outputDevice", audioDevices[playbackDevice].name);
+			}
+
 	}
-		
+
 	status = pjsua_set_snd_dev(captureDevice, playbackDevice);
 	if (status != PJ_SUCCESS) error_exit("Error starting pjsua", status);
 	config.inputDevice = inputDevice;
@@ -321,21 +329,124 @@ void sipCore::addBuddies()
 	}
 }
 
-int sipCore::makeCall(char * to)
+int sipCore::makeCall(int index)
 {
 	pjsua_call_id callId;
-	pj_str_t buri = pj_str(to);
-	pj_status_t status = pjsua_call_make_call(acc_id, &buri, 0, NULL, NULL, &callId);
+	pjsua_buddy_id in= ids[index];
+	pjsua_buddy_info info;
+	pjsua_buddy_get_info(in, &info);
+	pj_status_t status = pjsua_call_make_call(acc_id, &info.uri, 0, NULL, NULL, &callId);
 	if (status != PJ_SUCCESS) error_exit("cannot make call", status);
 
 	CallWindow * window = new CallWindow(NULL);
-	window->setCallerInfo(to);
+	window->setCallerInfo(info.uri.ptr);
 	window->setCallId(callId);
 	window->setStatusInfo("calling...");
 	window->hideAnswerButton();
 	window->show();
 
 	return 1;
+}
+
+void sipCore::playMedia(char * fileName)
+{
+	/*if(fileName == NULL) return;
+	pj_str_t f = pj_str(fileName);
+	pj_status_t status = pjsua_playlist_create(&f, 1, &f, PJMEDIA_FILE_NO_LOOP, NULL);
+	if(status != PJ_SUCCESS)
+	{
+		QMessageBox::information(NULL, "Warning!", "Cannot create media player");
+		return;
+	}*/
+/*		char buf[256];
+	char * ff = "sounds/DtmfStar.wav";
+	memcpy(buf, ff, strlen(ff) + 1);
+	pj_str_t ffileName = pj_str(buf);
+	playerId = (pjsua_player_id *)malloc(sizeof(pjsua_player_id));
+	pj_status_t status = pjsua_player_create(&ffileName, 0, playerId);
+
+
+	status = pjsua_player_set_pos(*playerId, 1);*/
+	pj_caching_pool cp;
+    pjmedia_endpt *med_endpt;
+    pj_pool_t *pool;
+    pjmedia_port *file_port;
+    pjmedia_snd_port *snd_port;
+    char tmp[10];
+    pj_status_t status;
+
+  /* Must create a pool factory before we can allocate any memory. */
+    pj_caching_pool_init(&cp, &pj_pool_factory_default_policy, 0);
+
+    /* 
+     * Initialize media endpoint.
+     * This will implicitly initialize PJMEDIA too.
+     */
+    status = pjmedia_endpt_create(&cp.factory, NULL, 1, &med_endpt);
+
+    /* Create memory pool for our file player */
+    pool = pj_pool_create( &cp.factory,	    /* pool factory	    */
+			   "wav",	    /* pool name.	    */
+			   4000,	    /* init size	    */
+			   4000,	    /* increment size	    */
+			   NULL		    /* callback on error    */
+			   );
+
+    /* Create file media port from the WAV file */
+    status = pjmedia_wav_player_port_create(  pool,	/* memory pool	    */
+					      fileName,	/* file to play	    */
+					      20,	/* ptime.	    */
+					      0,	/* flags	    */
+					      0,	/* default buffer   */
+					      &file_port/* returned port    */
+					      );
+	if(status != 0)
+	{
+		if(status == 70006) 
+		{
+			QMessageBox::information(NULL, "error!", "Cannot open sound file: not found");
+			pj_pool_release( pool );
+			return;
+		}
+	}
+
+    /* Create sound player port. */
+    status = pjmedia_snd_port_create_player( 
+		 pool,				    /* po ol		    */
+		 -1,				    /* use default dev.	    */
+		 file_port->info.clock_rate,	    /* clock rate.	    */
+		 file_port->info.channel_count,	    /* # of channels.	    */
+		 file_port->info.samples_per_frame, /* samples per frame.   */
+		 file_port->info.bits_per_sample,   /* bits per sample.	    */
+		 0,				    /* options		    */
+		 &snd_port			    /* returned port	    */
+		 );
+  
+    /* Connect file port to the sound player.
+     * Stream playing will commence immediately.
+     */
+    status = pjmedia_snd_port_connect( snd_port, file_port);
+	
+
+	  pj_thread_sleep(1000);
+
+	status = pjmedia_snd_port_disconnect(snd_port);
+ 
+    /* Without this sleep, Windows/DirectSound will repeteadly
+     * play the last frame during destroy.
+     */
+    pj_thread_sleep(100);
+
+    /* Destroy sound device */
+    //status = pjmedia_snd_port_destroy( snd_port );
+
+
+    /* Destroy file port */
+    status = pjmedia_port_destroy( file_port );
+ 
+
+    /* Release application pool */
+    pj_pool_release( pool );
 }
 
 void sipCore::on_buddy_state(pjsua_buddy_id buddy_id)
@@ -441,12 +552,25 @@ void sipCore::editContact(int row, char* name, char * URI)
 	settings.setValue(QString("buddy%1.name").arg(row), name);
 }
 
-void sipCore::saveConfig(config_struct * newConfig)
+void sipCore::saveConfig()
 {
+	saveDevices(config.inputDevice, config.outputDevice);
+
 	QSettings transportSettings("transport.ini", QSettings::IniFormat);
 	transportSettings.setIniCodec(QTextCodec::codecForName("UTF-8"));
 
+	transportSettings.setValue("public_address", config.publicAddress);
+	transportSettings.setValue("port", config.portNumber);
+	
 
+	QSettings registerSettings("registerInformation.ini", QSettings::IniFormat);
+	registerSettings.setIniCodec(QTextCodec::codecForName("UTF-8"));
+
+	registerSettings.setValue("id", config.id);
+	registerSettings.setValue("uri", config.uri);
+	registerSettings.setValue("realm", config.realm);
+	registerSettings.setValue("username", config.sipUser);
+	registerSettings.setValue("password", config.sipPassword);
 }
 
 void on_call_transfer_status(pjsua_call_id call_id, int st_code, const pj_str_t *st_text, pj_bool_t final, pj_bool_t *p_cont)
@@ -481,19 +605,35 @@ void on_call_state(pjsua_call_id call_id, pjsip_event * e)
 			sipCore::object->status.callStatus = 1;
 		else if(e->body.tsx_state.tsx->state == PJSIP_TSX_STATE_TERMINATED)
 		{
-			if(e->body.tsx_state.tsx->status_code == 0x0C8) //200 - OK
-				sipCore::object->status.callStatus = 2;
+			if(e->body.tsx_state.tsx->status_code == 0x0C8)
+				{
+					//200 - OK
+					sipCore::object->status.callStatus = 2;
+					sipCore::object->on_call_answered();
+					sipCore::object->callId = call_id;
+				}
+			if(e->body.tsx_state.tsx->status_code == 408 && sipCore::object->status.callStatus == 1)	//timeout
+			{
+				sipCore::object->status.callStatus = -1;  //cannot make a call 
+				sipCore::object->status.lastError = e->body.tsx_state.tsx->status_text;	//error text
+				sipCore::object->on_call_ended();
+				sipCore::object->callId = -1;
+			}
+
 		}
 		if(e->body.tsx_state.tsx->state == PJSIP_TSX_STATE_COMPLETED && (sipCore::object->status.callStatus == 2))
 		{
+			if(call_id != sipCore::object->callId ) return; //not that call
 			sipCore::object->status.callStatus = 0;	//end of call
 			sipCore::object->on_call_ended();
+			sipCore::object->callId = -1;
 		}
 		if(e->body.tsx_state.tsx->state == PJSIP_TSX_STATE_COMPLETED && (sipCore::object->status.callStatus == 1))
 		{
 			sipCore::object->status.callStatus = -1;  //cannot make a call 
 			sipCore::object->status.lastError = e->body.tsx_state.tsx->status_text;	//error text
 			sipCore::object->on_call_ended();
+			sipCore::object->callId = -1;
 		}
 	}
 }
@@ -539,10 +679,32 @@ void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data 
 // 	status = pjsua_call_answer(call_id, 200 / * what code??* /, NULL, NULL);
 // 	if(status != PJ_SUCCESS) error_exit("cannot answer call! ", status);
 */
+	if((sipCore::object->status.callStatus == 2) || (sipCore::object->status.callStatus == 1))
+	{
+		//busy
+		pjsua_call_answer(call_id, PJSIP_SC_BUSY_HERE, NULL, NULL);
+	}
 	sipCore::object->incom(acc_id, call_id, rdata);
 }
 
 void on_reg_state2(pjsua_acc_id acc_id, pjsua_reg_info *info)
 {
 	sipCore::object->on_reg_state2_emit(acc_id, info);
+}
+
+pjsip_redirect_op  on_call_redirected (pjsua_call_id call_id, const pjsip_uri *target, const pjsip_event *e)
+{
+	char uristr[PJSIP_MAX_URL_SIZE];
+	int len;
+
+	len = pjsip_uri_print(PJSIP_URI_IN_FROMTO_HDR, target, uristr, 
+		sizeof(uristr));
+
+	if (len < 1) 
+	{
+		pj_ansi_strcpy(uristr, "--URI too long--");
+	}
+	int result = QMessageBox::question(NULL, "Caller wants to redirect", QString("Redirect to %1 ?").arg(uristr));
+	if(result == QMessageBox::Ok) return PJSIP_REDIRECT_ACCEPT;
+	else return PJSIP_REDIRECT_REJECT;
 }

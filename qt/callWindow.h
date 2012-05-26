@@ -8,6 +8,7 @@
 
 #include "ui_callForm.h"
 #include "sipCore.h"
+#include "keypadForm.h"
 
 #include <pjlib.h>
 #include <pjlib-util.h>
@@ -35,15 +36,19 @@ public:
 
 
 	int status;
+	QWidget * keypad;
 
 private:
 	Ui::callForm ui;
 	pjsua_call_id callId;
 
+
 	public slots:
 		void answerButtonPressed();
 		void hangUpButtonPressed();
 		void on_call_end_slot();
+		void keypad_show();
+		void call_answered();
 };
 
 #endif
