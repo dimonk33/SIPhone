@@ -341,3 +341,4 @@ char * fromQString(QString & string)
 	retString[ba.size()] = 0;
 	return retString;
 }
+

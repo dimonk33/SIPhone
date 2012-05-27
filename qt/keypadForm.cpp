@@ -40,19 +40,31 @@ void keypadForm::closeButtonPressed()
 
 void keypadForm::playSound(QString key)
 {
+	pjsua_call_id callId = ((CallWindow*)parent)->getCallId();
+	pj_str_t string;
+	int flag = 0;
+	char * str;
 	if(key.compare("*") == 0)
 	{
-		sipCore::object->playMedia("sounds/DtmfStar.wav");
+		string = pj_str("*");
 	}
 	else if(key.compare("#") == 0)
 	{
-		sipCore::object->playMedia("sounds/Dtmf-.wav");
+		string = pj_str("#");
 	}
 	else 
 	{
-		QString playMediaString = QString("sounds/Dtmf%1.wav").arg(key);
-		char * str = fromQString(playMediaString);
-		sipCore::object->playMedia(str);
+		str = fromQString(key);
+		string = pj_str(str);
+		flag = 1;
+	}
+	pj_status_t status = pjsua_call_dial_dtmf(callId, &string);
+	if(status != PJ_SUCCESS)
+	{
+		QMessageBox::information(NULL, "Error!", QString("Cannot play %1 !").arg(key));
+	}
+	if(flag == 1)
+	{
 		free(str);
 	}
 }

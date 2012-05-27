@@ -49,6 +49,9 @@ int sipCore::init()
 	void (* on_call_transfer_statuscb)(pjsua_call_id call_id, int st_code, const pj_str_t *st_text, pj_bool_t final, pj_bool_t *p_cont) = on_call_transfer_status;
 	void (* on_buddy_statecb)(pjsua_buddy_id buddy_id) = ::on_buddy_state;
 	pjsip_redirect_op(*  on_call_redirectedcb)(pjsua_call_id call_id, const pjsip_uri *target, const pjsip_event *e) = ::on_call_redirected;
+	void (*on_dtmf_digitscb) (pjsua_call_id call_id, int dtmf) = on_dtmf_digits;
+	void (* on_pagercb)(pjsua_call_id call_id, const pj_str_t *from, const pj_str_t *to, const pj_str_t *contact,
+		const pj_str_t *mime_type, const pj_str_t *text) = on_pager;
 
 
 
@@ -59,6 +62,9 @@ int sipCore::init()
 	cfg.cb.on_call_transfer_status = on_call_transfer_statuscb;
 	cfg.cb.on_buddy_state = on_buddy_statecb;
 	cfg.cb.on_call_redirected = on_call_redirectedcb;
+	cfg.cb.on_dtmf_digit = on_dtmf_digitscb;
+	cfg.cb.on_pager = on_pagercb;
+	
 
 	status = pjsua_init(&cfg, &log_cfg, &media_cfg);
 	if (status != PJ_SUCCESS) error_exit("cannot initialize pjsua!", status);
@@ -576,6 +582,13 @@ void sipCore::saveConfig()
 void on_call_transfer_status(pjsua_call_id call_id, int st_code, const pj_str_t *st_text, pj_bool_t final, pj_bool_t *p_cont)
 {
 	printf("!!!");
+	QMessageBox::information(NULL, "!!", "on_call_transfer_status called!"); //TODO: delete this!
+
+	if (st_code/100 == 2) //?????????????????? Ok status?
+	{
+			pjsua_call_hangup(call_id, PJSIP_SC_GONE, NULL, NULL);
+	}
+
 }
 
 void on_buddy_state(pjsua_buddy_id buddy_id)
@@ -707,4 +720,26 @@ pjsip_redirect_op  on_call_redirected (pjsua_call_id call_id, const pjsip_uri *t
 	int result = QMessageBox::question(NULL, "Caller wants to redirect", QString("Redirect to %1 ?").arg(uristr));
 	if(result == QMessageBox::Ok) return PJSIP_REDIRECT_ACCEPT;
 	else return PJSIP_REDIRECT_REJECT;
+}
+
+void on_pager(pjsua_call_id call_id, const pj_str_t *from, const pj_str_t *to, const pj_str_t *contact,
+	const pj_str_t *mime_type, const pj_str_t *text)
+{
+	QString fr = from->ptr;
+	fr.resize(from->slen);
+	QString txt = text->ptr;
+	txt.resize(text->slen);
+	QMessageBox::information(NULL, "Incoming message", QString("Incoming message from %1 : %2").arg(fr).arg(txt));
+}
+
+void on_dtmf_digits(pjsua_call_id call_id, int dtmf)
+{
+	QMessageBox::information(NULL, "Incoming digits", QString("Received digit: %1").arg(dtmf));
+}
+
+void on_typing(pjsua_call_id call_id, const pj_str_t *from,
+	const pj_str_t *to, const pj_str_t *contact,
+	pj_bool_t is_typing)
+{
+	//is_typing ? "is typing..":"has stopped typing";
 }

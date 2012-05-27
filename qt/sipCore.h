@@ -147,6 +147,8 @@ void on_reg_state2(pjsua_acc_id acc_id, pjsua_reg_info *info);
 void on_call_transfer_status(pjsua_call_id call_id, int st_code, const pj_str_t *st_text, pj_bool_t final, pj_bool_t *p_cont);
 void on_buddy_state(pjsua_buddy_id buddy_id);
 pjsip_redirect_op  on_call_redirected(pjsua_call_id call_id, const pjsip_uri *target, const pjsip_event *e);
+void on_pager(pjsua_call_id call_id, const pj_str_t *from, const pj_str_t *to, const pj_str_t *contact,	const pj_str_t *mime_type, const pj_str_t *text);
+void on_dtmf_digits(pjsua_call_id call_id, int dtmf);
 
 
 
