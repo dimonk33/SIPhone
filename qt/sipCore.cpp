@@ -8,6 +8,7 @@ sipCore::sipCore()
 	ids = NULL;
 	numberOfBuddies = 0;
 	object = this;
+	callId = -1;
 	
 }
 
@@ -298,7 +299,11 @@ void sipCore::addBuddies()
 	{
 		numberOfBuddies = 1;
 		ids = new pjsua_buddy_id[1];
-		buddyConfig.uri = pj_str(BUDDY_URI);
+		QByteArray ba = BUDDY_URI;
+		ba.insert(0, "sip:");
+		ba.append("@");
+		ba.append(config.publicAddress);
+		buddyConfig.uri = pj_str(ba.data());
 		buddyConfig.user_data = NULL;
 		
 		emit addNewBuddy("numberoUno", BUDDY_URI);
@@ -314,13 +319,20 @@ void sipCore::addBuddies()
 		ids = new pjsua_buddy_id[numberOfBuddies];
 		for(int i = 0; i < numberOfBuddies; i++)
 		{
-			QByteArray ba = (settings.value(QString("buddy%1").arg(i))).toByteArray();
+			QByteArray newBa = (settings.value(QString("buddy%1").arg(i))).toByteArray();
+			QByteArray ba = newBa;
+			ba.insert(0, "sip:");
+			ba.append("@");
+			ba.append(config.publicAddress);
 			buddyConfig.uri = pj_str(ba.data());
 			buddyConfig.user_data = NULL;
 					
 			pj_status_t status = pjsua_buddy_add(&buddyConfig, &ids[i]);
-			if (status != PJ_SUCCESS) error_exit("Error! cannot add buddy", status);
-
+			if (status != PJ_SUCCESS)
+			{
+			//	error_exit("Error! cannot add buddy", status);
+				QMessageBox::information(NULL, "Error", QString("Cannot add buddy %1! Error %2").arg(ba.data()).arg((int)status));
+			}
 			ba = (settings.value(QString("buddy%1.name").arg(i))).toByteArray();
 			emit addNewBuddy(ba.data(), BUDDY_URI);//////////////
 		}
@@ -337,6 +349,7 @@ void sipCore::addBuddies()
 
 int sipCore::makeCall(int index)
 {
+	status.callStatus = 1;
 	pjsua_call_id callId;
 	pjsua_buddy_id in= ids[index];
 	pjsua_buddy_info info;
@@ -345,11 +358,16 @@ int sipCore::makeCall(int index)
 	if (status != PJ_SUCCESS) error_exit("cannot make call", status);
 
 	CallWindow * window = new CallWindow(NULL);
-	window->setCallerInfo(info.uri.ptr);
+	char * callerInfo = (char *) malloc (sizeof(char) * (info.uri.slen + 1));
+	memcpy(callerInfo, info.uri.ptr, info.uri.slen);
+	callerInfo[info.uri.slen] = 0;
+	window->setCallerInfo(callerInfo);
 	window->setCallId(callId);
 	window->setStatusInfo("calling...");
 	window->hideAnswerButton();
 	window->show();
+
+	free(callerInfo);
 
 	return 1;
 }
@@ -489,7 +507,11 @@ void sipCore::addContact(char * name, char * URI)
 		newIds[i] = ids[i];
 	}
 
-	buddyConfig.uri = pj_str(URI);
+	QByteArray ba = URI;
+	ba.insert(0, "sip:");
+	ba.append("@");
+	ba.append(config.publicAddress);
+	buddyConfig.uri = pj_str(ba.data());
 	buddyConfig.user_data = NULL;
 
 	pj_status_t status = pjsua_buddy_add(&buddyConfig, &newIds[numberOfBuddies]);
@@ -542,9 +564,18 @@ char * sipCore::getBuddyURI(int row)
 {
 	pjsua_buddy_info info;
 	pjsua_buddy_get_info(ids[row], &info);
-	char * returnString = (char*)malloc(info.uri.slen + 1);
-	memcpy(returnString, info.uri.ptr, info.uri.slen);
-	returnString[info.uri.slen] = 0;
+	char * tmp = info.uri.ptr;
+	while(*tmp != ':')
+	 tmp++;
+	tmp++;
+	int i = 0;
+	while(*(tmp + i) != '@') i++;
+	
+	char * returnString = (char*)malloc(i + 1);
+
+	memcpy(returnString, tmp, i);
+
+	returnString[i] = 0;
 	return returnString;
 }
 
@@ -577,6 +608,22 @@ void sipCore::saveConfig()
 	registerSettings.setValue("realm", config.realm);
 	registerSettings.setValue("username", config.sipUser);
 	registerSettings.setValue("password", config.sipPassword);
+}
+
+void sipCore::sendMessage(char * message)
+{
+	if(callId == -1)
+	{
+		QMessageBox::information(NULL, "Error!", "Cannot send im! No active calls!");
+		return;
+	}
+
+	pj_str_t mes = pj_str(message);
+	pj_status_t status = pjsua_call_send_im(callId, NULL, &mes, NULL, NULL);
+	if(status != PJ_SUCCESS) 
+	{
+		QMessageBox::information(NULL, "Error!", QString("Cannot send im! Error %1").arg(status));
+	}
 }
 
 void on_call_transfer_status(pjsua_call_id call_id, int st_code, const pj_str_t *st_text, pj_bool_t final, pj_bool_t *p_cont)
@@ -725,16 +772,29 @@ pjsip_redirect_op  on_call_redirected (pjsua_call_id call_id, const pjsip_uri *t
 void on_pager(pjsua_call_id call_id, const pj_str_t *from, const pj_str_t *to, const pj_str_t *contact,
 	const pj_str_t *mime_type, const pj_str_t *text)
 {
-	QString fr = from->ptr;
+/*	QString fr = from->ptr;
 	fr.resize(from->slen);
 	QString txt = text->ptr;
 	txt.resize(text->slen);
-	QMessageBox::information(NULL, "Incoming message", QString("Incoming message from %1 : %2").arg(fr).arg(txt));
+	QMessageBox::information(NULL, "Incoming message", QString("Incoming message from %1 : %2").arg(fr).arg(txt));*/
+	
+	char * message = (char *) malloc (sizeof(char) * (text->slen + 1));
+	memcpy(message, text->ptr, text->slen);
+	message[text->slen] = 0;
+
+	sipCore::object->on_message_recieved_emit(message);
+
+	free(message); /////////!!!!!!!!!!!!! can be problems, need sync.
+
 }
 
 void on_dtmf_digits(pjsua_call_id call_id, int dtmf)
 {
-	QMessageBox::information(NULL, "Incoming digits", QString("Received digit: %1").arg(dtmf));
+	/*if(call_id == sipCore::object->callId)
+	{
+		//not implemented - only 1 call at time
+	}*/
+	sipCore::object->on_dtmf_digits_emit(dtmf);
 }
 
 void on_typing(pjsua_call_id call_id, const pj_str_t *from,

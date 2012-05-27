@@ -154,6 +154,8 @@ void qt::editContact()
 {
 	addUserForm form(this);
 
+	form.setWindowTitle("Edit user");
+
 	int row = ui.listWidget->currentRow();
 	
 	char * URI_old = sipCore::object->getBuddyURI(row);

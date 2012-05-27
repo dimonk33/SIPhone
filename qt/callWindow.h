@@ -6,9 +6,11 @@
 
 #include <QMessageBox.h>
 
+
 #include "ui_callForm.h"
 #include "sipCore.h"
 #include "keypadForm.h"
+
 
 #include <pjlib.h>
 #include <pjlib-util.h>
@@ -41,6 +43,8 @@ public:
 private:
 	Ui::callForm ui;
 	pjsua_call_id callId;
+	
+	QWidget * console;
 
 
 	public slots:

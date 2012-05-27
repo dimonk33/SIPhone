@@ -37,7 +37,7 @@
 #define POOL_MEMORY_CREATION 1024
 #define POOL_MEMORY_CREATION_INCREMENT 32
 
-#define BUDDY_URI "sip:200@192.168.1.9"
+#define BUDDY_URI "200"
 
 #define FILE_CONFIG_ACCOUNT_SETTINGS "account.inf"
 #define REALM "asterisk"
@@ -125,6 +125,9 @@ public:
 	void deleteContact(int row);
 	void editContact(int row, char * name, char * URI);
 	void on_call_answered() {emit son_call_answered();}
+	void on_dtmf_digits_emit(char digit){emit son_dtmf_digit(digit);}
+	void on_message_recieved_emit(char * message){emit son_message_received(message);}
+	void sendMessage(char * message);
 
 	char * getBuddyURI(int row);
 
@@ -135,6 +138,8 @@ signals:
 	void son_call_ended();
 	void son_buddy_status_change(int row, int status);
 	void son_call_answered();
+	void son_dtmf_digit(char);
+	void son_message_received(char * );
 };
 
 char * copyString(char *);

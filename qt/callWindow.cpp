@@ -1,5 +1,7 @@
 #include "callWindow.h"
 
+#include "callTextForm.h"
+
 CallWindow::CallWindow(QWidget *parent, Qt::WFlags flags)
 	: QMainWindow(parent, flags)
 {
@@ -13,11 +15,15 @@ CallWindow::CallWindow(QWidget *parent, Qt::WFlags flags)
 	status = 0;
 	keypad = NULL;
 	setWindowFlags(Qt::CustomizeWindowHint | Qt::WindowMinimizeButtonHint);
+	console = new callTextForm();
+	console->show();
+	QObject::connect(sipCore::object, SIGNAL(son_dtmf_digit(char)), (callTextForm*)console, SLOT(dtfmDigitIsComing(char)));
+	QObject::connect(sipCore::object, SIGNAL(son_message_received(char *)), (callTextForm*)console, SLOT(messageReceived(char *)));
 }
 
 CallWindow::~CallWindow()
 {
-
+	delete console;
 }
 
 void CallWindow::setCallerInfo(char * callerInfo)

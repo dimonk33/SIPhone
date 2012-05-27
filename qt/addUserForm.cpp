@@ -55,7 +55,7 @@ QString addUserForm::getURI()
 void addUserForm::okButtonPressed()
 {
 	/*
-	*	1. Проверяем на то, ввели ли мы что-нить в sip adress 
+	*	1. Проверяем на то, ввели ли мы что-нить в sip address 
 	*	2. Проверяем на то, является ли данный адрес валидным
 	*	
 	*
@@ -64,18 +64,23 @@ void addUserForm::okButtonPressed()
 	QString sipAddress = ui.addressEdit->text();
 	if(sipAddress.size() == 0)
 	{
-		QMessageBox::warning(this, "Error", "Please enter sip address");
+		QMessageBox::warning(this, "Error", "Please enter sip number");
 		return;
 	}
 
-	QRegExp validAddress("{sip:}[0-9]*");
-
-/*	if(sipAddress.count(validAddress) == 0);
+//	QRegExp validAddress("[0-9]*");
+	bool ok;
+	sipAddress.toInt(&ok);
+	if(!ok)
 	{
-		QMessageBox::warning(this, "Error", "Please enter valid sip address");
+		QMessageBox::warning(this, "Error", "Please enter valid sip number");
 		return;
-	}*/
-
+	}
+	if(ui.nameEdit->text().size() == 0)
+	{
+		QMessageBox::warning(this, "Error", "Please enter name");
+		return;
+	}
 	////////////////подгоняем до сюда адрес до валидного состояния
 	if(forChanges == 0)	//adding contact
 	{

@@ -82,7 +82,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Sip address:</string>
+    <string>Sip number:</string>
    </property>
   </widget>
  </widget>
