@@ -38,8 +38,9 @@ public:
 
 
 	int status;
+	int holdStatus;
 	QWidget * keypad;
-
+	
 private:
 	Ui::callForm ui;
 	pjsua_call_id callId;
@@ -47,12 +48,14 @@ private:
 	QWidget * console;
 
 
-	public slots:
-		void answerButtonPressed();
-		void hangUpButtonPressed();
-		void on_call_end_slot();
-		void keypad_show();
-		void call_answered();
+public slots:
+	void answerButtonPressed();
+	void hangUpButtonPressed();
+	void on_call_end_slot();
+	void keypad_show();
+	void call_answered();
+	void consoleButtonPressed();
+	void holdButtonPressed();
 };
 
 #endif

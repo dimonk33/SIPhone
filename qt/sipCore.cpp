@@ -144,7 +144,9 @@ int sipCore::createTransport()
 	//transportConfig.qos_params = ????
 	//transportConfig.qos_type = ???
 
-	config.publicAddress = copyString(settings.value("public_address", PUBLIC_ADDRESS).toString().toAscii().data());
+	
+	config.publicAddress = fromQString(settings.value("public_address", PUBLIC_ADDRESS).toString());
+	//	copyString(settings.value("public_address", PUBLIC_ADDRESS).toString().toAscii().data());
 
 	transportConfig.public_addr = pj_str(config.publicAddress);
 
@@ -165,6 +167,7 @@ char * copyString(char * string)
 {
 	int size = strlen(string) + 1;
 	char * temp = (char*)malloc(sizeof(char) * size);
+	if(temp == NULL) return NULL;
 	memcpy(temp,string, size);
 	return temp;
 }
@@ -354,8 +357,12 @@ int sipCore::makeCall(int index)
 	pjsua_buddy_id in= ids[index];
 	pjsua_buddy_info info;
 	pjsua_buddy_get_info(in, &info);
-	pj_status_t status = pjsua_call_make_call(acc_id, &info.uri, 0, NULL, NULL, &callId);
-	if (status != PJ_SUCCESS) error_exit("cannot make call", status);
+	pj_status_t pjstatus = pjsua_call_make_call(acc_id, &info.uri, 0, NULL, NULL, &callId);
+	if (pjstatus != PJ_SUCCESS)
+	{
+		status.callStatus = 0;
+		error_exit("cannot make call", pjstatus);
+	}
 
 	CallWindow * window = new CallWindow(NULL);
 	char * callerInfo = (char *) malloc (sizeof(char) * (info.uri.slen + 1));
@@ -462,15 +469,15 @@ void sipCore::playMedia(char * fileName)
     pj_thread_sleep(100);
 
     /* Destroy sound device */
-    //status = pjmedia_snd_port_destroy( snd_port );
+   //status = pjmedia_snd_port_destroy( snd_port );
 
 
     /* Destroy file port */
-    status = pjmedia_port_destroy( file_port );
+    //status = pjmedia_port_destroy( file_port );
  
 
     /* Release application pool */
-    pj_pool_release( pool );
+    //pj_pool_release( pool );
 }
 
 void sipCore::on_buddy_state(pjsua_buddy_id buddy_id)
@@ -598,7 +605,7 @@ void sipCore::saveConfig()
 
 	transportSettings.setValue("public_address", config.publicAddress);
 	transportSettings.setValue("port", config.portNumber);
-	
+
 
 	QSettings registerSettings("registerInformation.ini", QSettings::IniFormat);
 	registerSettings.setIniCodec(QTextCodec::codecForName("UTF-8"));
@@ -654,6 +661,7 @@ void on_call_media_state(pjsua_call_id call_id)
 		pjsua_conf_connect(ci.conf_slot, 0);
 		pjsua_conf_connect(0, ci.conf_slot);
 	}
+	sipCore::object->callId = call_id;
 
 }
 
@@ -683,7 +691,7 @@ void on_call_state(pjsua_call_id call_id, pjsip_event * e)
 		}
 		if(e->body.tsx_state.tsx->state == PJSIP_TSX_STATE_COMPLETED && (sipCore::object->status.callStatus == 2))
 		{
-			if(call_id != sipCore::object->callId ) return; //not that call
+//			if(call_id != sipCore::object->callId ) return; //not that call
 			sipCore::object->status.callStatus = 0;	//end of call
 			sipCore::object->on_call_ended();
 			sipCore::object->callId = -1;

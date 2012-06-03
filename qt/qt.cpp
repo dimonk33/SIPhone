@@ -3,16 +3,17 @@
 qt::qt(QWidget *parent, Qt::WFlags flags)
 	: QMainWindow(parent, flags)
 {
+	sipCore::object = new sipCore();
 	ui.setupUi(this);
 	connect(ui.actionAbout, SIGNAL(activated()), this, SLOT(showAboutForm()));
 	connect(ui.actionExit,  SIGNAL(activated()), this, SLOT(on_exit()));
 	//core = new sipCore();
-	connect(&core, SIGNAL(addNewBuddy(char *, char *)), this, SLOT(addBuddy(char *, char *)));
+	connect(sipCore::object, SIGNAL(addNewBuddy(char *, char *)), this, SLOT(addBuddy(char *, char *)));
 //	core.makeWindow(this);
 //	connect(this, SIGNAL(bla(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rdata)), this, SLOT(blabla(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_rx_data * rdata)));
 	connect(ui.callButton, SIGNAL(pressed()), SLOT(makeCall()));
-	connect(&core, SIGNAL(son_incoming_call(int, int, void * )), this, SLOT(on_incoming_call_slot(int, int, void *)));
-	connect(&core, SIGNAL(son_reg_state2(pjsua_acc_id , pjsua_reg_info *)), this, SLOT(on_reg_state2_slot(pjsua_acc_id, pjsua_reg_info *)));
+	connect(sipCore::object, SIGNAL(son_incoming_call(int, int, void * )), this, SLOT(on_incoming_call_slot(int, int, void *)));
+	connect(sipCore::object, SIGNAL(son_reg_state2(pjsua_acc_id , pjsua_reg_info *)), this, SLOT(on_reg_state2_slot(pjsua_acc_id, pjsua_reg_info *)));
 	connect(ui.actionAdd_contact_2, SIGNAL(activated()), this, SLOT(addContact()));
 	connect(ui.actionDelete_contact, SIGNAL(activated()), this, SLOT(deleteContact()));
 	connect(ui.actionEdit_contact, SIGNAL(activated()), this, SLOT(editContact()));
@@ -21,7 +22,7 @@ qt::qt(QWidget *parent, Qt::WFlags flags)
 	connect(ui.addButton, SIGNAL(pressed()), this, SLOT(addContact()));
 	connect(ui.actionOptions, SIGNAL(activated()), this, SLOT(showOptions()));
 	connect(ui.optionsButton, SIGNAL(pressed()), this, SLOT(showOptions()));
-	core.init();
+	sipCore::object->init();
 }
 
 qt::~qt()
@@ -66,7 +67,7 @@ void qt::addBuddy(char * name, char * URI)
 
 void qt::makeCall()
 {
-	if(core.status.registerStatus != 1)
+	if(sipCore::object->status.registerStatus != 1)
 	{
 		QMessageBox::information(this, "Error", "Cannot make call - you are not registered to server");
 		return;
@@ -84,7 +85,7 @@ void qt::makeCall()
 	QString address = item->text();
 	QByteArray ba = address.toLatin1();
 	core.makeCall(ba.data());*/
-	core.makeCall(row);
+	sipCore::object->makeCall(row);
 }
 
 void qt::on_reg_state2_slot(pjsua_acc_id acc_id, pjsua_reg_info *info)
@@ -95,17 +96,17 @@ void qt::on_reg_state2_slot(pjsua_acc_id acc_id, pjsua_reg_info *info)
 	pjsua_acc_get_info(acc_id, &acc_info);
 	if(acc_info.status == PJSIP_SC_OK) // разобраться что за коды
 	{
-		core.status.registerStatus = 1;
+		sipCore::object->status.registerStatus = 1;
 		ui.registerStatus->setText("registered");
 	}
 	else if (acc_info.status == PJSIP_SC_FORBIDDEN)
 	{
-		core.status.registerStatus = 0;
+		sipCore::object->status.registerStatus = 0;
 		ui.registerStatus->setText("error - forbidden");
 	}
 	else if (acc_info.status == PJSIP_SC_REQUEST_TIMEOUT)
 	{
-		core.status.registerStatus = 0;
+		sipCore::object->status.registerStatus = 0;
 		ui.registerStatus->setText("error - timeout");
 	}
 }
@@ -333,6 +334,11 @@ void qt::showOptions()
 		QMessageBox::information(this, "Changes", "Changes will be activated on next launch");
 		sipCore::object->saveConfig();
 	}
+}
+
+void qt::makeCustomCall()
+{
+
 }
 
 char * fromQString(QString & string)

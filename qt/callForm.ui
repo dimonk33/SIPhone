@@ -94,22 +94,6 @@
     <string>Calling to blablablabla</string>
    </property>
   </widget>
-  <widget class="QProgressBar" name="progressBar">
-   <property name="geometry">
-    <rect>
-     <x>40</x>
-     <y>110</y>
-     <width>211</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="value">
-    <number>0</number>
-   </property>
-   <property name="format">
-    <string/>
-   </property>
-  </widget>
   <widget class="QPushButton" name="answerButton">
    <property name="enabled">
     <bool>true</bool>
@@ -135,9 +119,9 @@
    <property name="geometry">
     <rect>
      <x>210</x>
-     <y>190</y>
+     <y>220</y>
      <width>61</width>
-     <height>61</height>
+     <height>31</height>
     </rect>
    </property>
    <property name="font">
@@ -147,6 +131,42 @@
    </property>
    <property name="text">
     <string>keypad</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="consoleButton">
+   <property name="geometry">
+    <rect>
+     <x>210</x>
+     <y>180</y>
+     <width>61</width>
+     <height>31</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>12</pointsize>
+    </font>
+   </property>
+   <property name="text">
+    <string>console</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="holdButton">
+   <property name="geometry">
+    <rect>
+     <x>200</x>
+     <y>110</y>
+     <width>71</width>
+     <height>61</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>14</pointsize>
+    </font>
+   </property>
+   <property name="text">
+    <string>Hold</string>
    </property>
   </widget>
  </widget>

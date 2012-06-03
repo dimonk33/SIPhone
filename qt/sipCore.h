@@ -84,11 +84,11 @@ enum CALL_STATUSES
 class sipCore: public QObject
 {
 	Q_OBJECT 
-	void * mainWindow;
+//	void * mainWindow;
 	pjsua_acc_id acc_id;
 	pjsua_buddy_id * ids;
 	int numberOfBuddies;
-	pjsua_player_id * playerId;
+//	pjsua_player_id * playerId;
 
 public:
 	static sipCore * object;
